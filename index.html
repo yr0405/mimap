@@ -3,1015 +3,753 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>WanderMap 沖繩自由行排程版</title>
-    <!-- Tailwind CSS -->
+    <title>WanderMap 自由行小幫手</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- FontAwesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Leaflet Map CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
-    
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        body {
-            font-family: 'Inter', 'Noto Sans TC', sans-serif;
-            background-color: #f8fafc;
-            overscroll-behavior-y: none; 
-        }
-        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 10px; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f3f4f6; overflow: hidden; }
+        .app-container { display: flex; flex-direction: column; height: 100dvh; width: 100vw; position: fixed; inset: 0; }
+        #map-container { height: 35%; flex-shrink: 0; transition: height 0.3s ease; }
+        #map { width: 100%; height: 100%; }
+        #panel-container { flex: 1; overflow-y: auto; background: #fff; border-top-left-radius: 20px; border-top-right-radius: 20px; box-shadow: 0 -4px 10px rgba(0,0,0,0.05); z-index: 1000; padding-bottom: env(safe-area-inset-bottom); display: flex; flex-direction: column; }
+        .tab-btn { padding: 8px 16px; border-radius: 20px; font-weight: 600; font-size: 0.9rem; white-space: nowrap; transition: all 0.2s; border: 1px solid #e5e7eb; color: #6b7280; }
+        .tab-btn.active { background-color: #3b82f6; color: white; border-color: #3b82f6; }
+        .tab-btn.active-green { background-color: #10b981; color: white; border-color: #10b981; }
+        .tab-btn.active-yellow { background-color: #f59e0b; color: white; border-color: #f59e0b; }
         
-        .timeline-line {
-            position: absolute;
-            left: 23px;
-            top: 40px;
-            bottom: -30px;
-            width: 2px;
-            background-color: #e2e8f0;
-            z-index: 0;
-        }
-
-        .hide-scrollbar::-webkit-scrollbar { display: none; }
-        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        input[type="text"], input[type="password"], textarea { font-size: 16px; } /* 防止 iOS 自動放大 */
+        .timeline-item { position: relative; padding-left: 24px; margin-bottom: 16px; }
+        .timeline-item::before { content: ''; position: absolute; left: 7px; top: 24px; bottom: -16px; width: 2px; background-color: #e5e7eb; }
+        .timeline-item:last-child::before { display: none; }
+        .timeline-dot { position: absolute; left: 0; top: 4px; width: 16px; height: 16px; border-radius: 50%; background-color: #3b82f6; border: 3px solid #eff6ff; z-index: 1; }
         
-        /* 支援 iOS 底部安全距離 (Safe Area) */
-        @supports (padding-bottom: env(safe-area-inset-bottom)) {
-            .pb-safe { padding-bottom: calc(env(safe-area-inset-bottom) + 1.5rem); }
-        }
-        @supports not (padding-bottom: env(safe-area-inset-bottom)) {
-            .pb-safe { padding-bottom: 1.5rem; }
-        }
+        .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: white; padding: 10px 20px; border-radius: 30px; font-size: 0.9rem; z-index: 9999; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+        .search-results { position: absolute; top: 100%; left: 0; right: 0; background: white; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 50; max-height: 200px; overflow-y: auto; display: none; }
+        .search-result-item { padding: 10px; border-bottom: 1px solid #f3f4f6; cursor: pointer; }
+        .search-result-item:hover { background-color: #f9fafb; }
+        
+        #lock-screen { position: fixed; inset: 0; background: #111827; z-index: 99999; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; }
     </style>
 </head>
-<body class="fixed inset-0 w-full flex flex-col md:flex-row overflow-hidden text-slate-800 bg-slate-50">
+<body>
 
-    <!-- 🔒 安全鎖屏畫面 -->
-    <div id="lock-screen" class="fixed inset-0 bg-slate-900/95 backdrop-blur-md z-[999] flex flex-col items-center justify-center transition-opacity duration-500">
-        <div class="bg-white p-8 rounded-3xl shadow-2xl flex flex-col items-center max-w-sm w-[90%] transform transition-transform duration-300 scale-100" id="lock-box">
-            <div class="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center text-3xl mb-5 shadow-inner">
-                <i class="fa-solid fa-shield-halved"></i>
-            </div>
-            <h2 class="text-xl font-bold text-gray-800 mb-1">私人行程表</h2>
-            <p class="text-sm text-gray-500 mb-6 text-center">請輸入通行密碼以解鎖內容</p>
-            
-            <input type="password" id="passcode-input" class="w-full bg-slate-50 border border-slate-200 text-center text-2xl tracking-[0.5em] rounded-xl px-4 py-3 outline-none focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-50 transition-all mb-4 font-mono" placeholder="••••" onkeypress="if(event.key === 'Enter') unlockApp()">
-            
-            <button onclick="unlockApp()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl transition-all shadow-md hover:shadow-lg active:scale-95 flex justify-center items-center gap-2">
-                <i class="fa-solid fa-unlock-keyhole"></i> 解鎖進入
-            </button>
-            <p id="lock-error" class="text-red-500 text-sm mt-4 hidden bg-red-50 px-3 py-1 rounded-full"><i class="fa-solid fa-circle-xmark mr-1"></i> 密碼錯誤，請重試</p>
+    <!-- 鎖屏畫面 -->
+    <div id="lock-screen">
+        <i class="fas fa-lock text-5xl mb-6 text-blue-400"></i>
+        <h1 class="text-2xl font-bold mb-2">WanderMap</h1>
+        <p class="text-gray-400 mb-8">請輸入通行密碼</p>
+        <div class="flex gap-2">
+            <input type="password" id="password-input" class="px-4 py-3 rounded-lg text-black outline-none w-48 text-center text-lg" placeholder="••••">
+            <button onclick="checkPassword()" class="bg-blue-600 hover:bg-blue-700 px-6 py-3 rounded-lg font-bold transition">解鎖</button>
         </div>
     </div>
 
-    <!-- 地圖區塊 -->
-    <div class="h-[35%] md:h-full md:flex-1 shrink-0 relative z-0 bg-slate-200 order-1 md:order-2">
-        <div id="map" class="w-full h-full"></div>
-    </div>
+    <!-- 提示框 -->
+    <div id="toast" class="toast">已更新</div>
 
-    <!-- 左側(或下方)行程面板 -->
-    <div class="flex-1 md:h-full w-full md:w-[450px] lg:w-[500px] bg-white flex flex-col shadow-[0_-5px_20px_rgba(0,0,0,0.1)] md:shadow-xl z-10 relative order-2 md:order-1 rounded-t-3xl md:rounded-none overflow-hidden">
-        
-        <div class="md:hidden w-full flex justify-center pt-3 pb-1 shrink-0">
-            <div class="w-12 h-1.5 bg-gray-200 rounded-full"></div>
+    <div class="app-container">
+        <!-- 地圖區塊 -->
+        <div id="map-container">
+            <div id="map"></div>
         </div>
 
-        <div class="px-5 pt-2 md:pt-6 pb-2 border-b border-gray-100 shrink-0 bg-white">
-            <div class="flex justify-between items-start mb-2">
-                <div>
-                    <h1 class="text-xl md:text-2xl font-bold text-blue-600 flex items-center gap-2">
-                        沖繩五日遊 🌺
-                    </h1>
-                    <p class="text-xs md:text-sm text-gray-500 mt-1">2026.10.16 - 2026.10.20</p>
-                </div>
-                <div class="flex flex-col gap-2 items-end">
+        <!-- 面板區塊 -->
+        <div id="panel-container">
+            <!-- 頂部資訊與控制 -->
+            <div class="p-4 bg-white border-b sticky top-0 z-40">
+                <div class="flex justify-between items-center mb-3">
+                    <div>
+                        <h1 class="text-xl font-bold text-blue-800">沖繩五日遊 🌺</h1>
+                        <p class="text-xs text-gray-500">2026.10.16 - 2026.10.20</p>
+                    </div>
                     <div class="flex gap-2">
-                        <button onclick="toggleMemoModal()" class="bg-amber-100 text-amber-700 hover:bg-amber-200 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors shadow-sm flex items-center gap-2">
-                            <i class="fa-solid fa-clipboard-list"></i> <span class="hidden sm:inline">備忘錄</span>
+                        <button onclick="setApiKey()" class="text-gray-500 hover:text-blue-600 bg-gray-100 p-2 rounded-full text-xs flex items-center justify-center w-8 h-8" title="設定金鑰">
+                            <i class="fas fa-key"></i>
                         </button>
-                        <button onclick="toggleExpenseModal()" class="bg-emerald-100 text-emerald-700 hover:bg-emerald-200 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors shadow-sm flex items-center gap-2">
-                            <i class="fa-solid fa-file-invoice-dollar"></i> <span class="hidden sm:inline">記帳本</span>
-                        </button>
-                    </div>
-                    <!-- 新增：上鎖與重設按鈕區 -->
-                    <div class="flex gap-3">
-                        <button onclick="setApiKey()" class="text-xs text-slate-400 hover:text-indigo-500 transition-colors" title="設定 API Key"><i class="fa-solid fa-key mr-1"></i>金鑰</button>
-                        <button onclick="lockApp()" class="text-xs text-slate-400 hover:text-blue-500 transition-colors"><i class="fa-solid fa-lock mr-1"></i>上鎖</button>
-                        <button onclick="factoryReset()" class="text-xs text-slate-400 hover:text-red-500 transition-colors"><i class="fa-solid fa-rotate-right mr-1"></i>重設</button>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="flex gap-2 overflow-x-auto mt-3 hide-scrollbar pb-2" id="day-tabs"></div>
-        </div>
-
-        <!-- 新增景點輸入區 -->
-        <div class="px-5 py-3 bg-slate-50 border-b border-gray-200 flex gap-2 shrink-0 shadow-sm z-20">
-            <div class="flex-1 flex flex-col gap-2">
-                <input type="text" id="new-place-name" placeholder="輸入景點名稱 (如: 美國村)" class="w-full bg-white border border-slate-300 text-sm rounded-lg px-3 py-2 outline-none focus:border-blue-500 transition-colors shadow-sm" onkeypress="if(event.key === 'Enter') addNewPlace()">
-                <input type="text" id="new-place-note" placeholder="備註或營業時間 (選填)" class="w-full bg-white border border-slate-300 text-sm rounded-lg px-3 py-1.5 outline-none focus:border-blue-500 transition-colors shadow-sm" onkeypress="if(event.key === 'Enter') addNewPlace()">
-            </div>
-            <button onclick="addNewPlace()" class="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4 font-medium transition-colors shadow-sm whitespace-nowrap flex flex-col items-center justify-center gap-1 min-w-[70px]">
-                <i class="fa-solid fa-plus"></i>
-                <span class="text-xs">新增</span>
-            </button>
-        </div>
-
-        <!-- 行程列表區塊 -->
-        <div class="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-6 relative bg-slate-50/50 pb-safe" id="itinerary-panel"></div>
-    </div>
-
-    <!-- 旅遊備忘錄 Modal -->
-    <div id="memo-modal" class="fixed inset-0 bg-black/60 z-50 hidden flex justify-center items-end md:items-center p-0 md:p-4 backdrop-blur-sm transition-opacity duration-300 opacity-0">
-        <div id="memo-content" class="bg-white w-full md:max-w-2xl h-[85vh] md:h-[80vh] rounded-t-3xl md:rounded-2xl flex flex-col shadow-2xl transform translate-y-full md:translate-y-0 transition-transform duration-300 relative pointer-events-auto">
-            <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50 rounded-t-3xl md:rounded-t-2xl shrink-0">
-                <h2 class="text-lg md:text-xl font-bold text-gray-800"><i class="fa-solid fa-pen-to-square text-blue-500 mr-2"></i>行前資訊與備忘錄</h2>
-                <button onclick="toggleMemoModal()" class="text-gray-400 hover:text-gray-600 w-8 h-8 flex justify-center items-center rounded-full hover:bg-gray-200 transition-colors">
-                    <i class="fa-solid fa-xmark text-xl"></i>
-                </button>
-            </div>
-            <div class="p-6 overflow-y-auto custom-scrollbar flex-1 bg-white space-y-6 text-sm pb-safe">
-                <div class="bg-blue-50 rounded-xl p-4 border border-blue-100">
-                    <h3 class="font-bold text-blue-800 text-base mb-2 flex items-center"><i class="fa-solid fa-hotel mr-2"></i>住宿資訊</h3>
-                    <textarea id="hotel-text" oninput="saveHotelText()" class="w-full bg-transparent text-blue-900 border-none outline-none focus:ring-2 focus:ring-blue-300 rounded p-1 resize-none h-32 leading-relaxed" placeholder="輸入住宿資訊..."></textarea>
-                </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                        <h3 class="font-bold text-gray-800 border-b-2 border-green-400 pb-1 mb-3 inline-block">✅ 旅遊待辦清單</h3>
-                        <ul id="todo-list" class="space-y-2 text-gray-600"></ul>
-                    </div>
-                    <div>
-                        <h3 class="font-bold text-gray-800 border-b-2 border-orange-400 pb-1 mb-3 inline-block">🎒 行李檢查表</h3>
-                        <ul id="packing-list" class="space-y-2 text-gray-600"></ul>
-                    </div>
-                </div>
-                <div>
-                    <h3 class="font-bold text-gray-800 border-b-2 border-pink-400 pb-1 mb-3 inline-block">🛍️ 購物採買清單</h3>
-                    <ul id="shopping-list" class="space-y-2 text-gray-600"></ul>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- 旅遊記帳本 Modal -->
-    <div id="expense-modal" class="fixed inset-0 bg-black/60 z-50 hidden flex justify-center items-end md:items-center p-0 md:p-4 backdrop-blur-sm transition-opacity duration-300 opacity-0">
-        <div id="expense-content" class="bg-white w-full md:max-w-md h-[85vh] md:h-[80vh] rounded-t-3xl md:rounded-2xl flex flex-col shadow-2xl transform translate-y-full md:translate-y-0 transition-transform duration-300 relative pointer-events-auto">
-            <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-emerald-50 rounded-t-3xl md:rounded-t-2xl shrink-0">
-                <h2 class="text-lg md:text-xl font-bold text-emerald-800"><i class="fa-solid fa-file-invoice-dollar mr-2"></i>旅遊記帳本</h2>
-                <button onclick="toggleExpenseModal()" class="text-emerald-600 hover:text-emerald-800 w-8 h-8 flex justify-center items-center rounded-full hover:bg-emerald-200 transition-colors">
-                    <i class="fa-solid fa-xmark text-xl"></i>
-                </button>
-            </div>
-            
-            <!-- 總計區塊 -->
-            <div class="p-6 pb-3 shrink-0 bg-white">
-                <div class="bg-gradient-to-r from-emerald-500 to-teal-400 rounded-2xl p-4 text-white shadow-md flex justify-between items-center">
-                    <div>
-                        <p class="text-emerald-50 text-sm font-medium mb-1">目前總花費</p>
-                        <div class="text-3xl font-bold font-mono tracking-tight"><span class="text-xl mr-1">¥</span><span id="expense-total">0</span></div>
-                    </div>
-                    <div class="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
-                        <i class="fa-solid fa-coins text-2xl"></i>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 新增表單 -->
-            <div class="px-5 py-3 shrink-0 bg-slate-50 border-b border-gray-200 flex flex-col gap-2 shadow-sm z-10">
-                <!-- AI 掃描收據按鈕區塊 -->
-                <div class="flex justify-between items-center mb-1">
-                    <span class="text-[11px] text-gray-500 font-medium"><i class="fa-solid fa-pen mr-1"></i>手動輸入 或</span>
-                    <div class="flex gap-1.5">
-                        <input type="file" id="receipt-camera" accept="image/*" capture="environment" class="hidden" onchange="processReceipt(event, 'camera')">
-                        <button id="ai-scan-btn-camera" onclick="document.getElementById('receipt-camera').click()" class="text-[11px] bg-indigo-100 text-indigo-700 hover:bg-indigo-200 px-2 py-1.5 rounded-lg font-medium transition-colors flex items-center gap-1 shadow-sm">
-                            <i class="fa-solid fa-camera"></i> 拍照
-                        </button>
-                        
-                        <input type="file" id="receipt-upload" accept="image/*" class="hidden" onchange="processReceipt(event, 'upload')">
-                        <button id="ai-scan-btn-upload" onclick="document.getElementById('receipt-upload').click()" class="text-[11px] bg-indigo-100 text-indigo-700 hover:bg-indigo-200 px-2 py-1.5 rounded-lg font-medium transition-colors flex items-center gap-1 shadow-sm">
-                            <i class="fa-solid fa-image"></i> 相簿
+                        <button onclick="lockApp()" class="text-gray-500 hover:text-red-600 bg-gray-100 p-2 rounded-full text-xs flex items-center justify-center w-8 h-8" title="上鎖">
+                            <i class="fas fa-lock"></i>
                         </button>
                     </div>
                 </div>
-
-                <div class="flex gap-2">
-                    <select id="expense-category" class="bg-white border border-slate-300 text-sm rounded-lg px-2 py-2 outline-none focus:border-emerald-500 w-[100px] shrink-0 shadow-sm">
-                        <option value="🍔 飲食">🍔 飲食</option>
-                        <option value="🚗 交通">🚗 交通</option>
-                        <option value="🛍️ 購物">🛍️ 購物</option>
-                        <option value="🏠 住宿">🏠 住宿</option>
-                        <option value="🎫 娛樂">🎫 娛樂</option>
-                        <option value="📝 其他">📝 其他</option>
-                    </select>
-                    <input type="text" id="expense-name" placeholder="項目名稱 (如: 暖暮拉麵)" class="flex-1 bg-white border border-slate-300 text-sm rounded-lg px-3 py-2 outline-none focus:border-emerald-500 transition-colors shadow-sm">
-                </div>
-                <div class="flex gap-2">
-                    <div class="relative flex-1">
-                        <span class="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">¥</span>
-                        <input type="number" id="expense-amount" placeholder="輸入金額" class="w-full bg-white border border-slate-300 text-sm rounded-lg pl-8 pr-3 py-2 outline-none focus:border-emerald-500 transition-colors shadow-sm" onkeypress="if(event.key === 'Enter') addExpense()">
-                    </div>
-                    <button onclick="addExpense()" class="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg px-4 font-medium transition-colors shadow-sm whitespace-nowrap shrink-0 flex items-center gap-1 min-w-[70px] justify-center">
-                        <i class="fa-solid fa-plus text-xs"></i> 記一筆
-                    </button>
+                
+                <!-- 橫向捲動的頁籤 -->
+                <div class="flex overflow-x-auto pb-2 gap-2 hide-scrollbar" id="tabs-container">
+                    <!-- 頁籤由 JS 動態生成 -->
                 </div>
             </div>
 
-            <!-- 列表區塊 -->
-            <div class="p-4 overflow-y-auto custom-scrollbar flex-1 bg-slate-50/50 pb-safe">
-                <ul id="expense-list" class="space-y-2"></ul>
+            <!-- 內容區塊 -->
+            <div class="p-4 flex-1 overflow-y-auto bg-gray-50" id="main-content">
+                <!-- 內容由 JS 動態生成 -->
             </div>
         </div>
     </div>
 
-    <!-- 訊息提示 Toast -->
-    <div id="toast-container" class="fixed bottom-[max(20px,env(safe-area-inset-bottom))] left-1/2 transform -translate-x-1/2 z-[100] transition-all duration-300 opacity-0 pointer-events-none flex flex-col gap-2"></div>
-
-    <!-- 自訂確認對話框 -->
-    <div id="confirm-modal" class="fixed inset-0 bg-black/50 z-[100] hidden flex justify-center items-center backdrop-blur-sm opacity-0 transition-opacity duration-300">
-        <div class="bg-white rounded-2xl p-6 w-[90%] max-w-sm shadow-2xl transform scale-95 transition-transform duration-300" id="confirm-box">
-            <h3 class="text-lg font-bold text-gray-800 mb-2">⚠️ 確定要執行嗎？</h3>
-            <p class="text-gray-600 text-sm mb-6" id="confirm-message">這項操作無法復原。</p>
-            <div class="flex justify-end gap-3">
-                <button onclick="closeConfirm()" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition-colors">取消</button>
-                <button id="confirm-action-btn" class="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-medium transition-colors">確定執行</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- API Key 專屬設定 Modal -->
-    <div id="apikey-modal" class="fixed inset-0 bg-black/50 z-[100] hidden flex justify-center items-center backdrop-blur-sm opacity-0 transition-opacity duration-300">
-        <div class="bg-white rounded-2xl p-6 w-[90%] max-w-sm shadow-2xl transform scale-95 transition-transform duration-300" id="apikey-box">
-            <h3 class="text-lg font-bold text-gray-800 mb-2"><i class="fa-solid fa-key text-indigo-500 mr-2"></i>設定 Gemini API Key</h3>
-            <p class="text-gray-600 text-xs mb-4 leading-relaxed">這把鑰匙僅會加密儲存於您的手機，不會上傳伺服器。<br>若需清除，請清空下方欄位並儲存。</p>
-            <input type="password" id="apikey-input" placeholder="貼上您的 AIza... 金鑰" class="w-full bg-slate-50 border border-slate-300 text-sm rounded-lg px-3 py-2.5 outline-none focus:border-indigo-500 mb-5 font-mono">
-            <div class="flex justify-end gap-3">
-                <button onclick="closeApiKeyModal()" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition-colors">取消</button>
-                <button onclick="saveApiKey()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors shadow-sm">儲存設定</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Leaflet Map JS -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        // ==========================================
-        // 🔒 密碼安全設定區塊
-        // ==========================================
-        // ★★★ 請在這裡修改你的專屬密碼 ★★★
-        const APP_PASSWORD = "1234"; 
+        // --- 核心設定 ---
+        const APP_PASSWORD = "1234"; // 登入密碼
+        const defaultApiKey = "";    // AI 金鑰預設空白
         
-        function checkLockStatus() {
-            const lockScreen = document.getElementById('lock-screen');
-            // 檢查 localStorage 是否有解鎖紀錄
-            if (localStorage.getItem('wanderMap_Unlocked') === 'true') {
-                lockScreen.style.display = 'none'; // 直接隱藏，不播動畫以求順暢
-            } else {
-                lockScreen.style.display = 'flex';
-                // 延遲 Focus 密碼框
-                setTimeout(() => document.getElementById('passcode-input').focus(), 100);
+        // 狀態變數
+        let map;
+        let markers = [];
+        let polylines = [];
+        let activeTab = 'unassigned'; // 預設顯示待安排
+        let tripData = {};
+        let expenses = [];
+        let memos = {
+            todo: { title: "旅遊待辦", items: [] },
+            luggage: { title: "出國必帶物品", items: [] },
+            shopping: { title: "購物清單", items: [] }
+        };
+
+        // 預設景點資料庫 (初始載入用)
+        const initialPlaces = [
+            { id: 1, name: "那霸機場", address: "沖縄県那覇市鏡水150", lat: 26.2045, lng: 127.6499 },
+            { id: 2, name: "Prince Smart Inn Naha", address: "沖縄県那覇市松山2-4-13", lat: 26.2195, lng: 127.6806 },
+            { id: 3, name: "美國村", address: "沖縄県中頭郡北谷町美浜", lat: 26.3163, lng: 127.7578 },
+            { id: 4, name: "大創 AEON那霸店", address: "沖縄県那覇市金城5-10-2", lat: 26.1963, lng: 127.6622 },
+            { id: 5, name: "國際通商圈", address: "沖縄県那覇市牧志", lat: 26.2152, lng: 127.6847 },
+            { id: 6, name: "獅薩伴手禮店 那霸機場店", address: "那覇空港內 2W-06區", lat: 26.2045, lng: 127.6499 },
+            { id: 7, name: "西來院達摩寺", address: "沖縄県那覇市首里赤田町1-5-1", lat: 26.2201, lng: 127.7241 },
+            { id: 8, name: "Shisa Cookie", address: "沖縄県那覇市松尾1丁目1-1", lat: 26.2139, lng: 127.6798 },
+            { id: 9, name: "金澤壽司 縣政廳站前", address: "沖縄県那覇市久茂地1丁目1-1", lat: 26.2132, lng: 127.6792 },
+            { id: 10, name: "Cream D (生甜甜圈)", address: "沖縄県那覇市おもろまち4-1", lat: 26.2227, lng: 127.6974 },
+            { id: 11, name: "麥當勞姬百合通壺屋店", address: "沖縄県那覇市壺屋1-28-18", lat: 26.2104, lng: 127.6913 },
+            { id: 12, name: "吉野家 百合之姬通店", address: "沖縄県那覇市壺屋2-6-5", lat: 26.2081, lng: 127.6946 }
+        ];
+
+        // --- 初始化與安全鎖 ---
+        function initApp() {
+            if (localStorage.getItem('wandermap_auth') === APP_PASSWORD) {
+                document.getElementById('lock-screen').style.display = 'none';
+                loadData();
+                initMap();
+                renderTabs();
+                renderContent();
             }
         }
 
-        function unlockApp() {
-            const input = document.getElementById('passcode-input').value;
-            const errorMsg = document.getElementById('lock-error');
-            const lockBox = document.getElementById('lock-box');
-            
-            if (input === APP_PASSWORD) {
-                // 密碼正確，存入 localStorage
-                localStorage.setItem('wanderMap_Unlocked', 'true');
-                const lockScreen = document.getElementById('lock-screen');
-                lockScreen.classList.add('opacity-0');
-                setTimeout(() => lockScreen.style.display = 'none', 500);
+        function checkPassword() {
+            const pwd = document.getElementById('password-input').value;
+            if (pwd === APP_PASSWORD) {
+                localStorage.setItem('wandermap_auth', pwd);
+                initApp();
             } else {
-                // 密碼錯誤，顯示錯誤與震動特效
-                errorMsg.classList.remove('hidden');
-                document.getElementById('passcode-input').value = '';
-                
-                // 簡單的 CSS 震動特效
-                lockBox.style.transform = 'translateX(-10px)';
-                setTimeout(() => lockBox.style.transform = 'translateX(10px)', 50);
-                setTimeout(() => lockBox.style.transform = 'translateX(-10px)', 100);
-                setTimeout(() => lockBox.style.transform = 'translateX(10px)', 150);
-                setTimeout(() => lockBox.style.transform = 'translateX(0)', 200);
-
-                setTimeout(() => errorMsg.classList.add('hidden'), 2000);
+                alert("密碼錯誤");
             }
         }
 
         function lockApp() {
-            // 清除解鎖紀錄並重新整理網頁
-            localStorage.removeItem('wanderMap_Unlocked');
+            localStorage.removeItem('wandermap_auth');
             location.reload();
         }
-        // ==========================================
 
+        // --- 資料管理 ---
+        function loadData() {
+            const savedData = localStorage.getItem('wandermap_trip');
+            const savedExpenses = localStorage.getItem('wandermap_expenses');
+            const savedMemos = localStorage.getItem('wandermap_memos');
 
-        // 預設的所有景點資料
-        const defaultPool = [
-            { id: 1, name: "那霸機場", lat: 26.2063, lng: 127.6514, note: "抵達沖繩，領取行李 / 出境", icon: "fa-plane", color: "text-blue-500", bg: "bg-blue-100" },
-            { id: 2, name: "Prince Smart Inn Naha", lat: 26.2185, lng: 127.6797, note: "住宿 Check-in。善用單軌一日券", icon: "fa-hotel", color: "text-purple-500", bg: "bg-purple-100" },
-            { id: 3, name: "國際通商圈", lat: 26.2166, lng: 127.6848, note: "逛街、買薯條三兄弟 (第一牧志市場周邊)", icon: "fa-bag-shopping", color: "text-pink-500", bg: "bg-pink-100" },
-            { id: 4, name: "金澤壽司 (縣政廳站)", lat: 26.2148, lng: 127.6789, note: "晚餐：美味壽司", icon: "fa-utensils", color: "text-red-500", bg: "bg-red-100" },
-            { id: 5, name: "Cream D 生甜甜圈", lat: 26.2230, lng: 127.6976, note: "歌町站。人氣口味：抹茶、紅豆 (DSF旁)", icon: "fa-cookie-bite", color: "text-yellow-500", bg: "bg-yellow-100" },
-            { id: 6, name: "白色麥當勞 (壺屋店)", lat: 26.2120, lng: 127.6917, note: "沖繩限定白色麥當勞 (姬百合通壺屋店)", icon: "fa-burger", color: "text-orange-500", bg: "bg-orange-100" },
-            { id: 7, name: "安次富文具店 (牧志)", lat: 26.2173, lng: 127.6833, note: "採買文具 (Yasugiya Shop Pro)", icon: "fa-pen-ruler", color: "text-emerald-500", bg: "bg-emerald-100" },
-            { id: 8, name: "西來院達摩寺", lat: 26.2195, lng: 127.7214, note: "首里城站走路10分鐘", icon: "fa-vihara", color: "text-red-600", bg: "bg-red-100" },
-            { id: 9, name: "CARTOLERIA 文具", lat: 26.2148, lng: 127.6788, note: "Palette Kumoji 8F (縣廳前站)", icon: "fa-pen-clip", color: "text-emerald-500", bg: "bg-emerald-100" },
-            { id: 10, name: "Shisa Cookie", lat: 26.2141, lng: 127.6799, note: "風獅爺造型曲奇餅 (縣政廳站 松尾1-1-1)", icon: "fa-cookie", color: "text-orange-500", bg: "bg-orange-100" },
-            { id: 11, name: "大創 AEON那霸店", lat: 26.1963, lng: 127.6660, note: "小祿站旁，大量採買泡澡球 (約100日圓)", icon: "fa-store", color: "text-purple-500", bg: "bg-purple-100" },
-            { id: 12, name: "吉野家 (壺屋店)", lat: 26.2115, lng: 127.6920, note: "百合之姬通店", icon: "fa-bowl-rice", color: "text-orange-600", bg: "bg-orange-100" },
-            { id: 13, name: "獅薩伴手禮店", lat: 26.2063, lng: 127.6514, note: "那霸機場內 2W-06區", icon: "fa-gift", color: "text-pink-500", bg: "bg-pink-100" }
-        ];
-
-        let appState = {
-            unscheduled: JSON.parse(JSON.stringify(defaultPool)),
-            days: [ [], [], [], [], [] ] 
-        };
-
-        const savedData = localStorage.getItem('wanderMapV4_Data');
-        if (savedData) {
-            try { appState = JSON.parse(savedData); } catch(e) { console.error("Data parse error"); }
-        }
-
-        let currentTab = -1; 
-        let confirmActionCallback = null;
-
-        function showMessage(msg, isError = false) {
-            const container = document.getElementById('toast-container');
-            const toast = document.createElement('div');
-            toast.className = `px-4 py-2 rounded-full shadow-lg text-sm font-medium text-white ${isError ? 'bg-red-500' : 'bg-gray-800'} transform translate-y-4 opacity-0 transition-all duration-300 flex items-center mb-2`;
-            toast.innerHTML = isError ? `<i class="fa-solid fa-circle-exclamation mr-2"></i>${msg}` : `<i class="fa-solid fa-circle-check mr-2 text-green-400"></i>${msg}`;
-            container.appendChild(toast);
-            
-            container.classList.remove('opacity-0');
-            setTimeout(() => toast.classList.remove('translate-y-4', 'opacity-0'), 10);
-            setTimeout(() => {
-                toast.classList.add('opacity-0', 'translate-y-4');
-                setTimeout(() => toast.remove(), 300);
-            }, 3000);
-        }
-
-        function showConfirm(message, callback) {
-            document.getElementById('confirm-message').textContent = message;
-            confirmActionCallback = callback;
-            const modal = document.getElementById('confirm-modal');
-            modal.classList.remove('hidden');
-            setTimeout(() => {
-                modal.classList.remove('opacity-0');
-                document.getElementById('confirm-box').classList.remove('scale-95');
-            }, 10);
-            
-            document.getElementById('confirm-action-btn').onclick = () => {
-                closeConfirm();
-                if (confirmActionCallback) confirmActionCallback();
-            };
-        }
-
-        function closeConfirm() {
-            const modal = document.getElementById('confirm-modal');
-            modal.classList.add('opacity-0');
-            document.getElementById('confirm-box').classList.add('scale-95');
-            setTimeout(() => modal.classList.add('hidden'), 300);
-        }
-
-        async function addNewPlace() {
-            const nameInput = document.getElementById('new-place-name');
-            const noteInput = document.getElementById('new-place-note');
-            const name = nameInput.value.trim();
-            const note = noteInput.value.trim();
-
-            if (!name) { showMessage('請輸入景點名稱！', true); return; }
-
-            const btn = document.querySelector('button[onclick="addNewPlace()"]');
-            const originalHTML = btn.innerHTML;
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span class="text-xs">搜尋中</span>';
-            btn.disabled = true;
-
-            try {
-                const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(name)}&limit=1`);
-                const data = await response.json();
-
-                let lat = 26.2123; 
-                let lng = 127.6792;
-                
-                if (data && data.length > 0) {
-                    lat = parseFloat(data[0].lat);
-                    lng = parseFloat(data[0].lon);
-                    showMessage(`成功加入「${name}」並找到座標！`);
-                } else {
-                    showMessage(`找不到精確座標，已暫時放置於市區。`, true);
-                }
-
-                const newPlace = { id: Date.now(), name: name, lat: lat, lng: lng, note: note, icon: "fa-map-pin", color: "text-teal-600", bg: "bg-teal-100" };
-
-                if (currentTab === -1) { appState.unscheduled.unshift(newPlace); } 
-                else { appState.days[currentTab].push(newPlace); }
-
-                saveState(); renderTabs(); renderItinerary();
-                nameInput.value = ''; noteInput.value = '';
-                
-            } catch (err) {
-                showMessage('網路異常，已手動強制加入。', true);
-                const newPlace = { id: Date.now(), name: name, lat: 26.2123, lng: 127.6792, note: note, icon: "fa-map-pin", color: "text-teal-600", bg: "bg-teal-100" };
-                if (currentTab === -1) appState.unscheduled.unshift(newPlace);
-                else appState.days[currentTab].push(newPlace);
-                saveState(); renderTabs(); renderItinerary();
-                nameInput.value = ''; noteInput.value = '';
-            } finally {
-                btn.innerHTML = originalHTML; btn.disabled = false;
-            }
-        }
-
-        function saveState() { localStorage.setItem('wanderMapV4_Data', JSON.stringify(appState)); }
-
-        function factoryReset() {
-            showConfirm("確定要重設所有行程嗎？景點將會回到預設狀態。", () => {
-                localStorage.removeItem('wanderMapV4_Data');
-                appState = {
-                    unscheduled: JSON.parse(JSON.stringify(defaultPool)),
-                    days: [ [], [], [], [], [] ]
+            if (savedData) {
+                tripData = JSON.parse(savedData);
+            } else {
+                // 預設資料
+                tripData = {
+                    'unassigned': [...initialPlaces],
+                    'day1': [], 'day2': [], 'day3': [], 'day4': [], 'day5': []
                 };
-                currentTab = -1;
-                renderTabs(); renderItinerary(); showMessage("資料已成功重設。");
-            });
+                saveData();
+            }
+            if (savedExpenses) expenses = JSON.parse(savedExpenses);
+            if (savedMemos) memos = JSON.parse(savedMemos);
         }
 
+        function saveData() {
+            localStorage.setItem('wandermap_trip', JSON.stringify(tripData));
+            localStorage.setItem('wandermap_expenses', JSON.stringify(expenses));
+            localStorage.setItem('wandermap_memos', JSON.stringify(memos));
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.innerText = msg;
+            toast.style.opacity = '1';
+            setTimeout(() => { toast.style.opacity = '0'; }, 2000);
+        }
+
+        // --- 介面渲染 ---
         function renderTabs() {
-            const tabsContainer = document.getElementById('day-tabs');
-            tabsContainer.innerHTML = '';
-            
-            const unscheduledActive = currentTab === -1 ? 'bg-amber-500 text-white shadow-md' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50';
-            tabsContainer.innerHTML += `
-                <button onclick="switchTab(-1)" class="whitespace-nowrap px-4 py-1.5 rounded-full text-sm font-semibold transition-all ${unscheduledActive}">
-                    📍 待安排 (${appState.unscheduled.length})
-                </button>`;
-
-            appState.days.forEach((day, index) => {
-                const isActive = index === currentTab;
-                const activeClass = isActive ? 'bg-blue-600 text-white shadow-md' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50';
-                tabsContainer.innerHTML += `
-                    <button onclick="switchTab(${index})" class="whitespace-nowrap px-4 py-1.5 rounded-full text-sm font-semibold transition-all ${activeClass}">
-                        Day ${index + 1} (${day.length})
-                    </button>`;
-            });
-        }
-
-        function switchTab(index) {
-            currentTab = index; renderTabs(); renderItinerary();
-            document.getElementById('itinerary-panel').scrollTop = 0;
-        }
-
-        function moveItemToDay(fromTab, index, toTabStr) {
-            const toTab = parseInt(toTabStr);
-            if(isNaN(toTab) || fromTab === toTab) return;
-
-            let item = fromTab === -1 ? appState.unscheduled.splice(index, 1)[0] : appState.days[fromTab].splice(index, 1)[0];
-            if (toTab === -1) { appState.unscheduled.push(item); } else { appState.days[toTab].push(item); }
-
-            saveState(); renderTabs(); renderItinerary(); showMessage("景點移動成功！");
-        }
-
-        function reorderItem(tab, index, direction) {
-            let list = tab === -1 ? appState.unscheduled : appState.days[tab];
-            if (direction === -1 && index > 0) {
-                [list[index - 1], list[index]] = [list[index], list[index - 1]];
-            } else if (direction === 1 && index < list.length - 1) {
-                [list[index + 1], list[index]] = [list[index], list[index + 1]];
-            }
-            saveState(); renderItinerary();
-        }
-        
-        function deleteItem(tab, index) {
-            showConfirm("確定要刪除這個景點嗎？", () => {
-                if (tab === -1) { appState.unscheduled.splice(index, 1); } else { appState.days[tab].splice(index, 1); }
-                saveState(); renderTabs(); renderItinerary(); showMessage("景點已刪除");
-            });
-        }
-
-        function renderItinerary() {
-            const container = document.getElementById('itinerary-panel');
-            container.innerHTML = '';
-            
-            const list = currentTab === -1 ? appState.unscheduled : appState.days[currentTab];
-
-            if (list.length === 0) {
-                container.innerHTML = `
-                    <div class="h-full flex flex-col items-center justify-center text-gray-400 pb-10">
-                        <i class="fa-solid fa-map-location-dot text-4xl mb-3 text-gray-300"></i>
-                        <p>此區塊目前沒有景點</p>
-                        <p class="text-xs mt-1">請從上方新增，或從「待安排」移入</p>
-                    </div>`;
-                updateMap(list); return;
-            }
-
-            list.forEach((place, index) => {
-                const isLast = index === list.length - 1;
-                const showTimeline = currentTab !== -1 && !isLast; 
-                
-                let itemHTML = `
-                <div class="relative flex gap-3 mb-1 group">
-                    ${showTimeline ? '<div class="timeline-line"></div>' : ''}
-                    
-                    <div class="flex flex-col items-center z-10 w-[40px] shrink-0">
-                        <div class="w-10 h-10 rounded-full ${place.bg} ${place.color} flex justify-center items-center shadow-sm border-2 border-white ring-1 ring-gray-100 z-10">
-                            <i class="fa-solid ${place.icon} text-sm"></i>
-                        </div>
-                    </div>
-                    
-                    <div class="flex-1 bg-white border border-gray-100 p-3.5 rounded-2xl shadow-sm relative z-10 mb-2 transition-shadow hover:shadow-md">
-                        <div class="flex justify-between items-start">
-                            <h3 class="font-bold text-gray-800 text-base leading-tight">${place.name}</h3>
-                            <button onclick="deleteItem(${currentTab}, ${index})" class="text-gray-300 hover:text-red-500 transition-colors p-1" title="刪除景點"><i class="fa-solid fa-xmark"></i></button>
-                        </div>
-                        ${place.note ? `<div class="mt-2 text-xs text-gray-600 bg-gray-50 p-2 rounded-lg border border-gray-100 leading-relaxed"><i class="fa-solid fa-circle-info text-blue-400 mr-1.5"></i>${place.note}</div>` : ''}
-                        
-                        <div class="flex justify-between items-center mt-3 pt-2 border-t border-gray-50">
-                            <div class="flex gap-1">
-                                <button onclick="reorderItem(${currentTab}, ${index}, -1)" class="w-7 h-7 flex items-center justify-center bg-gray-50 hover:bg-gray-200 rounded text-gray-500 transition-colors" ${index === 0 ? 'disabled style="opacity:0.3"' : ''} title="向上移動"><i class="fa-solid fa-arrow-up text-xs"></i></button>
-                                <button onclick="reorderItem(${currentTab}, ${index}, 1)" class="w-7 h-7 flex items-center justify-center bg-gray-50 hover:bg-gray-200 rounded text-gray-500 transition-colors" ${isLast ? 'disabled style="opacity:0.3"' : ''} title="向下移動"><i class="fa-solid fa-arrow-down text-xs"></i></button>
-                            </div>
-                            
-                            <select onchange="moveItemToDay(${currentTab}, ${index}, this.value)" class="text-xs bg-slate-100 text-slate-700 border-none rounded-lg px-2 py-1 outline-none cursor-pointer font-medium hover:bg-slate-200 transition-colors">
-                                <option value="" disabled selected>移動景點至...</option>
-                                <option value="-1" ${currentTab===-1?'disabled':''}>📍 待安排清單</option>
-                                <option value="0" ${currentTab===0?'disabled':''}>Day 1</option>
-                                <option value="1" ${currentTab===1?'disabled':''}>Day 2</option>
-                                <option value="2" ${currentTab===2?'disabled':''}>Day 3</option>
-                                <option value="3" ${currentTab===3?'disabled':''}>Day 4</option>
-                                <option value="4" ${currentTab===4?'disabled':''}>Day 5</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>`;
-                container.insertAdjacentHTML('beforeend', itemHTML);
-
-                if (showTimeline) {
-                    const nextPlace = list[index + 1];
-                    const navHTML = `
-                    <div class="relative pl-[3.5rem] pr-2 py-1.5 z-10 w-full flex items-center gap-3">
-                        <div class="bg-white border border-gray-200 rounded-full px-4 py-1.5 flex items-center gap-4 shadow-sm">
-                            <a href="https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(place.name)}&destination=${encodeURIComponent(nextPlace.name)}&travelmode=driving" target="_blank" class="text-gray-400 hover:text-blue-500 transition-colors" title="開車導航"><i class="fa-solid fa-car text-sm"></i></a>
-                            <div class="w-px h-3 bg-gray-200"></div>
-                            <a href="https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(place.name)}&destination=${encodeURIComponent(nextPlace.name)}&travelmode=transit" target="_blank" class="text-gray-400 hover:text-green-600 transition-colors" title="大眾運輸"><i class="fa-solid fa-train-subway text-sm"></i></a>
-                            <div class="w-px h-3 bg-gray-200"></div>
-                            <a href="https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(place.name)}&destination=${encodeURIComponent(nextPlace.name)}&travelmode=walking" target="_blank" class="text-gray-400 hover:text-orange-500 transition-colors" title="步行導航"><i class="fa-solid fa-person-walking text-sm"></i></a>
-                        </div>
-                    </div>`;
-                    container.insertAdjacentHTML('beforeend', navHTML);
-                }
-            });
-            updateMap(list);
-        }
-
-        let map = L.map('map', { zoomControl: false }).setView([26.2123, 127.6792], 13);
-        L.control.zoom({ position: 'topright' }).addTo(map);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { maxZoom: 19 }).addTo(map);
-        window.addEventListener('resize', () => { setTimeout(() => map.invalidateSize(), 200); });
-
-        let currentMarkers = [];
-        let currentPolyline = null;
-
-        function clearMap() {
-            currentMarkers.forEach(marker => map.removeLayer(marker));
-            currentMarkers = [];
-            if (currentPolyline) { map.removeLayer(currentPolyline); currentPolyline = null; }
-        }
-
-        function updateMap(list) {
-            clearMap();
-            const bounds = [];
-            const latlngs = [];
-
-            list.forEach((place, index) => {
-                if (place.lat && place.lng) {
-                    const latlng = [place.lat, place.lng];
-                    latlngs.push(latlng); bounds.push(latlng);
-                    const markerText = currentTab === -1 ? '<i class="fa-solid fa-location-dot"></i>' : (index + 1);
-                    const bgColor = currentTab === -1 ? 'bg-amber-500' : 'bg-blue-600';
-                    const markerHtml = `<div class="${bgColor} text-white w-6 h-6 rounded-full flex justify-center items-center font-bold shadow-lg border-2 border-white text-xs">${markerText}</div>`;
-                    const customIcon = L.divIcon({ html: markerHtml, className: '', iconSize: [24, 24], iconAnchor: [12, 12] });
-                    const marker = L.marker(latlng, {icon: customIcon}).bindPopup(`<b class="text-sm">${place.name}</b>`).addTo(map);
-                    currentMarkers.push(marker);
-                }
-            });
-
-            if (currentTab !== -1 && latlngs.length > 1) {
-                currentPolyline = L.polyline(latlngs, { color: '#3b82f6', weight: 4, opacity: 0.8, dashArray: '8, 8', lineJoin: 'round' }).addTo(map);
-            }
-
-            setTimeout(() => {
-                map.invalidateSize();
-                if (bounds.length > 0) { map.fitBounds(L.latLngBounds(bounds), { padding: [30, 30], maxZoom: 15 }); }
-            }, 100);
-        }
-
-        const defaultMemoData = {
-            hotel: "Prince Smart Inn Naha\n📍 沖繩縣那霸市松山2-4-13\n交通建議：多善用「單軌電車 24 小時一日券」；前往美國村可至「縣廳前」或「那霸巴士總站」搭乘路線公車。\n1F 行李空間\n4F 自動販賣機 製冰器 微波爐\n5F 洗衣角（收費/2台）",
-            todo: [ { text: "買旅平險", done: false }, { text: "買ESIM列印QRCode", done: false }, { text: "換日幣70000", done: false }, { text: "列印機票", done: false }, { text: "入境VISA", done: false }, { text: "加入外交部領事line", done: false } ],
-            packing: [ { text: "護照、機票影本", done: false }, { text: "ESIM、日幣現金、信用卡兩張", done: false }, { text: "眼鏡盒、行動電源、充電線、充電器", done: false }, { text: "行李箱+行李套+手提行李袋", done: false }, { text: "旅行組：洗臉/洗髮/牙膏/牙刷/保養", done: false }, { text: "短袖x5、長褲x2、外套x1", done: false }, { text: "睡衣褲x1、內衣褲x5、襪子x5", done: false } ],
-            shopping: [ { text: "泡澡球：大創 (AEON那霸店/小祿站)，約100日圓未稅", done: false }, { text: "文具：安次富文具店、CARTOLERIA", done: false }, { text: "國際通：薯條三兄弟", done: false }, { text: "藥妝：ok繃", done: false }, { text: "相片列印紙CP1500:KC-18IL 8格貼紙18張", done: false }, { text: "那霸機場：獅薩伴手禮店 隨意買", done: false }, { text: "伴手禮：Shisa Cookie 風獅爺造型曲奇", done: false } ]
-        };
-
-        let currentMemoData = JSON.parse(localStorage.getItem('wanderMapV4_Memo')) || JSON.parse(JSON.stringify(defaultMemoData));
-
-        // ==========================================
-        // 💰 旅遊記帳本邏輯
-        // ==========================================
-        let expenses = JSON.parse(localStorage.getItem('wanderMapV4_Expenses')) || [];
-        let editingExpenseId = null;
-
-        function saveExpenses() {
-            localStorage.setItem('wanderMapV4_Expenses', JSON.stringify(expenses));
-            renderExpenses();
-        }
-
-        function toggleExpenseModal() {
-            const modal = document.getElementById('expense-modal');
-            if (modal.classList.contains('hidden')) {
-                renderExpenses();
-                modal.classList.remove('hidden');
-                setTimeout(() => { modal.classList.remove('opacity-0'); document.getElementById('expense-content').classList.remove('translate-y-full'); }, 10);
-            } else {
-                modal.classList.add('opacity-0');
-                document.getElementById('expense-content').classList.add('translate-y-full');
-                setTimeout(() => modal.classList.add('hidden'), 300);
-            }
-        }
-
-        function addExpense() {
-            const nameInput = document.getElementById('expense-name');
-            const amountInput = document.getElementById('expense-amount');
-            const categorySelect = document.getElementById('expense-category');
-            
-            const name = nameInput.value.trim();
-            const amount = parseInt(amountInput.value);
-            const category = categorySelect.value;
-
-            if (!name || isNaN(amount) || amount <= 0) {
-                showMessage('請輸入正確的項目名稱與金額！', true);
-                return;
-            }
-
-            expenses.unshift({ id: Date.now(), name, amount, category, date: new Date().toLocaleDateString() });
-            saveExpenses();
-            showMessage('成功記上一筆！');
-            
-            nameInput.value = '';
-            amountInput.value = '';
-            nameInput.focus();
-        }
-
-        // 開始編輯狀態
-        function startEditExpense(id) {
-            editingExpenseId = id;
-            renderExpenses();
-        }
-
-        // 取消編輯狀態
-        function cancelEditExpense() {
-            editingExpenseId = null;
-            renderExpenses();
-        }
-
-        // 儲存編輯內容
-        function saveEditExpense(id) {
-            const name = document.getElementById(`edit-name-${id}`).value.trim();
-            const amount = parseInt(document.getElementById(`edit-amount-${id}`).value);
-            const category = document.getElementById(`edit-cat-${id}`).value;
-
-            if (!name || isNaN(amount) || amount <= 0) {
-                showMessage('請輸入正確的項目名稱與金額！', true);
-                return;
-            }
-
-            const index = expenses.findIndex(exp => exp.id === id);
-            if (index !== -1) {
-                expenses[index].name = name;
-                expenses[index].amount = amount;
-                expenses[index].category = category;
-                saveExpenses();
-                showMessage('修改成功！');
-            }
-            editingExpenseId = null;
-            renderExpenses();
-        }
-
-        function deleteExpense(id) {
-            showConfirm("確定要刪除這筆花費紀錄嗎？", () => {
-                expenses = expenses.filter(exp => exp.id !== id);
-                saveExpenses();
-                showMessage('已刪除紀錄');
-            });
-        }
-
-        function renderExpenses() {
-            const list = document.getElementById('expense-list');
-            const totalSpan = document.getElementById('expense-total');
-            list.innerHTML = '';
-            
-            let total = 0;
-
-            if (expenses.length === 0) {
-                list.innerHTML = `<div class="text-center text-gray-400 py-10"><i class="fa-solid fa-receipt text-4xl mb-3 text-gray-200"></i><p class="mt-2 text-sm">目前還沒有任何花費紀錄</p></div>`;
-            } else {
-                expenses.forEach(exp => {
-                    total += exp.amount;
-                    
-                    if (editingExpenseId === exp.id) {
-                        // 編輯模式的 UI
-                        const categories = ['🍔 飲食', '🚗 交通', '🛍️ 購物', '🏠 住宿', '🎫 娛樂', '📝 其他'];
-                        let optionsHtml = categories.map(cat => `<option value="${cat}" ${exp.category === cat ? 'selected' : ''}>${cat}</option>`).join('');
-                        
-                        list.innerHTML += `
-                            <li class="bg-indigo-50 border border-indigo-200 rounded-xl p-3 shadow-inner flex flex-col gap-2">
-                                <div class="flex gap-2">
-                                    <select id="edit-cat-${exp.id}" class="bg-white border border-slate-300 text-xs rounded px-1 py-1.5 outline-none focus:border-indigo-500 w-[85px] shrink-0">
-                                        ${optionsHtml}
-                                    </select>
-                                    <input type="text" id="edit-name-${exp.id}" value="${exp.name}" class="flex-1 bg-white border border-slate-300 text-sm rounded px-2 py-1.5 outline-none focus:border-indigo-500">
-                                </div>
-                                <div class="flex justify-between items-center mt-1">
-                                    <div class="relative flex-1 mr-3">
-                                        <span class="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400 text-xs">¥</span>
-                                        <input type="number" id="edit-amount-${exp.id}" value="${exp.amount}" class="w-full bg-white border border-slate-300 text-sm rounded pl-6 pr-2 py-1.5 outline-none focus:border-indigo-500">
-                                    </div>
-                                    <div class="flex gap-1.5 shrink-0">
-                                        <button onclick="cancelEditExpense()" class="bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors">取消</button>
-                                        <button onclick="saveEditExpense(${exp.id})" class="bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-3 py-1.5 text-xs font-medium transition-colors shadow-sm">儲存</button>
-                                    </div>
-                                </div>
-                            </li>
-                        `;
-                    } else {
-                        // 一般顯示模式的 UI
-                        list.innerHTML += `
-                            <li class="bg-white border border-gray-100 rounded-xl p-3 flex justify-between items-center shadow-sm hover:shadow transition-shadow group">
-                                <div class="flex items-center gap-3">
-                                    <div class="w-10 h-10 rounded-full bg-slate-50 border border-gray-100 flex items-center justify-center text-lg shrink-0">${exp.category.split(' ')[0]}</div>
-                                    <div class="flex flex-col">
-                                        <span class="text-sm font-bold text-gray-800 leading-tight">${exp.name}</span>
-                                        <span class="text-[11px] text-gray-400 mt-0.5">${exp.date}</span>
-                                    </div>
-                                </div>
-                                <div class="flex items-center gap-2">
-                                    <span class="font-mono font-bold text-emerald-600 text-base mr-1">¥${exp.amount.toLocaleString()}</span>
-                                    <button onclick="startEditExpense(${exp.id})" class="text-gray-300 hover:text-blue-500 transition-colors p-1.5 focus:opacity-100" title="編輯項目"><i class="fa-solid fa-pen text-xs"></i></button>
-                                    <button onclick="deleteExpense(${exp.id})" class="text-gray-300 hover:text-red-500 transition-colors p-1.5 focus:opacity-100" title="刪除項目"><i class="fa-solid fa-trash-can text-xs"></i></button>
-                                </div>
-                            </li>
-                        `;
-                    }
-                });
-            }
-            totalSpan.textContent = total.toLocaleString();
-        }
-
-        // ==========================================
-        // 📸 AI 收據掃描邏輯 (整合 Gemini API)
-        // ==========================================
-        function setApiKey() {
-            const currentKey = localStorage.getItem('wanderMapV4_GeminiKey') || '';
-            document.getElementById('apikey-input').value = currentKey;
-            
-            const modal = document.getElementById('apikey-modal');
-            modal.classList.remove('hidden');
-            setTimeout(() => {
-                modal.classList.remove('opacity-0');
-                document.getElementById('apikey-box').classList.remove('scale-95');
-                document.getElementById('apikey-input').focus();
-            }, 10);
-        }
-
-        function closeApiKeyModal() {
-            const modal = document.getElementById('apikey-modal');
-            modal.classList.add('opacity-0');
-            document.getElementById('apikey-box').classList.add('scale-95');
-            setTimeout(() => modal.classList.add('hidden'), 300);
-        }
-
-        function saveApiKey() {
-            const newKey = document.getElementById('apikey-input').value.trim();
-            if (newKey === '') {
-                localStorage.removeItem('wanderMapV4_GeminiKey');
-                showMessage('已清除 API Key 設定');
-            } else {
-                localStorage.setItem('wanderMapV4_GeminiKey', newKey);
-                showMessage('API Key 設定已安全儲存！');
-            }
-            closeApiKeyModal();
-        }
-
-        async function processReceipt(event, type = 'camera') {
-            const file = event.target.files[0];
-            if (!file) return;
-
-            // 確保可以重複選擇同一張照片
-            event.target.value = '';
-
-            let apiKey = localStorage.getItem('wanderMapV4_GeminiKey');
-            if (!apiKey) {
-                showMessage('請先設定 API Key 才能使用掃描功能！', true);
-                setApiKey(); // 直接幫使用者打開設定面板
-                return;
-            }
-
-            showMessage('📸 正在處理照片，請稍候...');
-            const btnId = type === 'camera' ? 'ai-scan-btn-camera' : 'ai-scan-btn-upload';
-            const scanBtn = document.getElementById(btnId);
-            const originalBtnHTML = scanBtn.innerHTML;
-            scanBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>...';
-            scanBtn.disabled = true;
-
-            try {
-                // 1. 將圖片壓縮並轉為 Base64 (避免手機照片過大傳輸過久)
-                const base64Image = await compressImage(file);
-
-                // 2. 設定 AI 的任務提示 (Prompt) - 升級細項辨識邏輯
-                const promptStr = "這是一張日文或中文的消費收據/發票。請幫我精準辨識出『商店/餐廳名稱』、『購買的細項品項列表(菜單名或商品名)』以及『最終總金額(含稅，純數字)』。如果找不到店名，請填寫空字串。";
-
-                // 3. 準備發送給 Gemini API 的資料格式
-                const payload = {
-                    contents: [{
-                        role: "user",
-                        parts: [
-                            { text: promptStr },
-                            { inlineData: { mimeType: "image/jpeg", data: base64Image } }
-                        ]
-                    }],
-                    // 強制 AI 輸出 JSON 格式，方便我們直接填入表格
-                    generationConfig: {
-                        responseMimeType: "application/json",
-                        responseSchema: {
-                            type: "OBJECT",
-                            properties: {
-                                "shopName": { type: "STRING", description: "商店或餐廳名稱" },
-                                "items": { 
-                                    type: "ARRAY", 
-                                    items: { type: "STRING" },
-                                    description: "消費的細項品項名稱陣列"
-                                },
-                                "totalAmount": { type: "INTEGER", description: "最終總含稅金額" }
-                            }
-                        }
-                    }
-                };
-
-                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-
-                if (response.status === 400 || response.status === 403) {
-                    localStorage.removeItem('wanderMapV4_GeminiKey');
-                    throw new Error("API Key 無效，請點擊齒輪重新設定！");
-                }
-
-                const result = await response.json();
-                
-                // 4. 解析 AI 回傳的結果並自動填入輸入框
-                if (result.candidates && result.candidates[0].content.parts[0].text) {
-                    const jsonStr = result.candidates[0].content.parts[0].text;
-                    const parsedData = JSON.parse(jsonStr);
-
-                    // 組合名稱：店名 (細項1, 細項2...)
-                    let finalName = "";
-                    const shop = parsedData.shopName ? parsedData.shopName.trim() : "";
-                    const details = (parsedData.items && parsedData.items.length > 0) ? parsedData.items.join(", ") : "";
-
-                    if (shop && details) {
-                        finalName = `${shop} (${details})`;
-                    } else if (shop) {
-                        finalName = shop;
-                    } else if (details) {
-                        finalName = details;
-                    } else {
-                        finalName = "未知名稱消費";
-                    }
-
-                    // 如果字數太長，做適當的截斷，避免版面破掉
-                    if (finalName.length > 50) {
-                        finalName = finalName.substring(0, 48) + "...";
-                    }
-
-                    document.getElementById('expense-name').value = finalName;
-                    
-                    if (parsedData.totalAmount) {
-                        document.getElementById('expense-amount').value = parsedData.totalAmount;
-                    }
-
-                    showMessage('✨ 辨識成功！已帶入細項與含稅總額。');
-                } else {
-                    throw new Error("無法辨識收據內容");
-                }
-            } catch (error) {
-                console.error("AI 辨識錯誤:", error);
-                showMessage(error.message || '辨識失敗，請確認照片清晰或重新輸入 API Key。', true);
-            } finally {
-                // 恢復按鈕狀態
-                scanBtn.innerHTML = originalBtnHTML;
-                scanBtn.disabled = false;
-            }
-        }
-
-        // 圖片壓縮輔助工具 (將幾十MB的照片縮小，加快 AI 處理速度)
-        function compressImage(file) {
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    const img = new Image();
-                    img.onload = () => {
-                        const canvas = document.createElement('canvas');
-                        let width = img.width;
-                        let height = img.height;
-                        const MAX_SIZE = 1024; // 最大邊長限制
-
-                        if (width > height) {
-                            if (width > MAX_SIZE) { height *= MAX_SIZE / width; width = MAX_SIZE; }
-                        } else {
-                            if (height > MAX_SIZE) { width *= MAX_SIZE / height; height = MAX_SIZE; }
-                        }
-                        
-                        canvas.width = width;
-                        canvas.height = height;
-                        const ctx = canvas.getContext('2d');
-                        ctx.drawImage(img, 0, 0, width, height);
-
-                        // 轉換為 Base64 字串 (去除前綴)
-                        const dataURL = canvas.toDataURL('image/jpeg', 0.8);
-                        resolve(dataURL.split(',')[1]);
-                    };
-                    img.onerror = reject;
-                    img.src = e.target.result;
-                };
-                reader.onerror = reject;
-                reader.readAsDataURL(file);
-            });
-        }
-        // ==========================================
-
-        function saveMemo() { localStorage.setItem('wanderMapV4_Memo', JSON.stringify(currentMemoData)); }
-        function saveHotelText() { currentMemoData.hotel = document.getElementById('hotel-text').value; saveMemo(); }
-        function toggleMemoCheckbox(cat, idx) { currentMemoData[cat][idx].done = !currentMemoData[cat][idx].done; saveMemo(); renderMemoCategory(cat); }
-        function updateMemoText(cat, idx, text) { currentMemoData[cat][idx].text = text; saveMemo(); }
-        function deleteMemoItem(cat, idx) { currentMemoData[cat].splice(idx, 1); saveMemo(); renderMemoCategory(cat); }
-        
-        function addMemoItem(cat) {
-            currentMemoData[cat].push({ text: "", done: false });
-            saveMemo(); renderMemoCategory(cat);
-            setTimeout(() => {
-                const inputs = document.getElementById(`${cat}-list`).querySelectorAll('input[type="text"]');
-                if(inputs.length > 0) inputs[inputs.length - 1].focus();
-            }, 50);
-        }
-
-        function renderMemoCategory(category) {
-            const container = document.getElementById(`${category}-list`);
+            const container = document.getElementById('tabs-container');
             let html = '';
-            let colorClass = category === 'todo' ? 'text-green-600 focus:ring-green-500' : category === 'packing' ? 'text-orange-500 focus:ring-orange-500' : 'text-pink-500 focus:ring-pink-500';
-
-            currentMemoData[category].forEach((item, index) => {
-                const textStyle = item.done ? 'line-through text-gray-400' : 'text-gray-700';
-                html += `
-                    <li class="flex gap-2 items-start group">
-                        <input type="checkbox" class="mt-1.5 w-4 h-4 rounded border-gray-300 ${colorClass}" ${item.done ? 'checked' : ''} onchange="toggleMemoCheckbox('${category}', ${index})">
-                        <input type="text" class="flex-1 bg-transparent border-b border-transparent focus:border-gray-200 outline-none px-1 py-0.5 transition-colors ${textStyle}" value="${item.text}" oninput="updateMemoText('${category}', ${index}, this.value)" placeholder="輸入內容...">
-                        <button onclick="deleteMemoItem('${category}', ${index})" class="text-gray-300 hover:text-red-500 md:opacity-0 group-hover:opacity-100 transition-opacity p-1 focus:opacity-100"><i class="fa-solid fa-trash-can text-sm"></i></button>
-                    </li>`;
-            });
-            html += `<li class="flex gap-2 items-center text-sm text-gray-400 cursor-pointer hover:text-blue-500 mt-2 px-1 transition-colors w-max" onclick="addMemoItem('${category}')"><i class="fa-solid fa-plus"></i> 新增項目...</li>`;
+            
+            // 待安排
+            const unCount = tripData['unassigned'].length;
+            html += `<button onclick="switchTab('unassigned')" class="tab-btn ${activeTab === 'unassigned' ? 'active-yellow' : ''}">📍 待安排 (${unCount})</button>`;
+            
+            // 天數
+            for (let i = 1; i <= 5; i++) {
+                const dayKey = `day${i}`;
+                const count = tripData[dayKey] ? tripData[dayKey].length : 0;
+                html += `<button onclick="switchTab('${dayKey}')" class="tab-btn ${activeTab === dayKey ? 'active' : ''}">Day ${i} (${count})</button>`;
+            }
+            
+            // 備忘錄與記帳
+            html += `<button onclick="switchTab('memo')" class="tab-btn ${activeTab === 'memo' ? 'active' : ''}">📋 備忘錄</button>`;
+            html += `<button onclick="switchTab('expense')" class="tab-btn ${activeTab === 'expense' ? 'active-green' : ''}">💰 記帳本</button>`;
+            
             container.innerHTML = html;
         }
 
-        function renderAllMemos() {
-            document.getElementById('hotel-text').value = currentMemoData.hotel;
-            renderMemoCategory('todo'); renderMemoCategory('packing'); renderMemoCategory('shopping');
+        function switchTab(tab) {
+            activeTab = tab;
+            renderTabs();
+            
+            // 全版切換邏輯
+            const mapContainer = document.getElementById('map-container');
+            if (tab === 'memo' || tab === 'expense') {
+                mapContainer.style.height = '0';
+                mapContainer.style.overflow = 'hidden';
+            } else {
+                mapContainer.style.height = '35%';
+                setTimeout(() => { if(map) map.invalidateSize(); }, 300);
+            }
+            
+            renderContent();
+            updateMap();
         }
 
-        function toggleMemoModal() {
-            const modal = document.getElementById('memo-modal');
-            if (modal.classList.contains('hidden')) {
-                renderAllMemos();
-                modal.classList.remove('hidden');
-                setTimeout(() => { modal.classList.remove('opacity-0'); document.getElementById('memo-content').classList.remove('translate-y-full'); }, 10);
+        function renderContent() {
+            const container = document.getElementById('main-content');
+            
+            if (activeTab === 'memo') {
+                container.innerHTML = renderMemos();
+            } else if (activeTab === 'expense') {
+                container.innerHTML = renderExpenses();
             } else {
-                modal.classList.add('opacity-0');
-                document.getElementById('memo-content').classList.add('translate-y-full');
-                setTimeout(() => modal.classList.add('hidden'), 300);
+                container.innerHTML = renderItinerary(activeTab);
             }
         }
 
-        // 初始化
-        window.onload = () => {
-            checkLockStatus(); // ★ 檢查安全鎖狀態
+        // --- 地圖功能 ---
+        function initMap() {
+            map = L.map('map').setView([26.2123, 127.6792], 11);
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
+            }).addTo(map);
+        }
+
+        function updateMap() {
+            if(activeTab === 'memo' || activeTab === 'expense') return;
+
+            markers.forEach(m => map.removeLayer(m));
+            polylines.forEach(p => map.removeLayer(p));
+            markers = []; polylines = [];
+
+            const places = tripData[activeTab] || [];
+            if (places.length === 0) return;
+
+            const latlngs = [];
+            places.forEach((place, index) => {
+                const latlng = [place.lat, place.lng];
+                latlngs.push(latlng);
+                
+                const iconHtml = `<div style="background-color:${activeTab==='unassigned'?'#f59e0b':'#3b82f6'};color:white;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-weight:bold;border:2px solid white;box-shadow:0 2px 4px rgba(0,0,0,0.3);">${index + 1}</div>`;
+                const customIcon = L.divIcon({ html: iconHtml, className: '', iconSize: [24, 24], iconAnchor: [12, 12] });
+                
+                const marker = L.marker(latlng, { icon: customIcon }).addTo(map)
+                    .bindTooltip(place.name, { permanent: false, direction: 'top' })
+                    .on('click', () => {
+                        const el = document.getElementById(`place-card-${place.id}`);
+                        if(el) {
+                            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            el.style.backgroundColor = '#eff6ff';
+                            setTimeout(() => { el.style.backgroundColor = 'white'; }, 1500);
+                        }
+                    });
+                markers.push(marker);
+            });
+
+            if (activeTab !== 'unassigned' && latlngs.length > 1) {
+                const polyline = L.polyline(latlngs, { color: '#3b82f6', weight: 3, dashArray: '5, 10' }).addTo(map);
+                polylines.push(polyline);
+            }
+
+            if (latlngs.length > 0) {
+                map.fitBounds(L.latLngBounds(latlngs), { padding: [30, 30] });
+            }
+        }
+
+        // --- 行程與景點 ---
+        function renderItinerary(tabKey) {
+            const places = tripData[tabKey] || [];
+            let html = `
+                <div class="relative bg-white rounded-lg p-3 mb-4 shadow-sm border border-gray-100 z-50">
+                    <div class="flex gap-2">
+                        <input type="text" id="new-place-input" class="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-400" placeholder="搜尋景點 (如：美國村)" onkeyup="if(event.key==='Enter') searchPlace()">
+                        <button onclick="searchPlace()" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-sm hover:bg-blue-700">搜尋</button>
+                    </div>
+                    <div id="search-results-dropdown" class="search-results"></div>
+                </div>
+            `;
+
+            if (places.length === 0) {
+                html += `<div class="text-center text-gray-400 mt-10 py-10 bg-white rounded-xl border border-dashed border-gray-300">此列表尚無景點<br>請從上方搜尋或從「待安排」移入</div>`;
+                return html;
+            }
+
+            html += `<div class="mt-2">`;
+            places.forEach((place, index) => {
+                html += `
+                    <div class="timeline-item" id="place-card-${place.id}" style="transition: background-color 0.5s;">
+                        <div class="timeline-dot" style="${tabKey==='unassigned'?'background-color:#f59e0b; border-color:#fef3c7;':''}"></div>
+                        <div class="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+                            
+                            <div class="flex justify-between items-start mb-2">
+                                <div class="flex-1">
+                                    <h3 class="font-bold text-gray-800 text-lg">${place.name}</h3>
+                                    ${place.address ? `<p class="text-xs text-gray-500 mt-1"><i class="fas fa-map-marker-alt mr-1"></i>${place.address}</p>` : ''}
+                                </div>
+                                <div class="flex gap-2 text-gray-400">
+                                    <button onclick="editPlacePrompt(${place.id})" class="hover:text-blue-500"><i class="fas fa-pencil-alt"></i></button>
+                                    <button onclick="copyPlace(${place.id})" class="hover:text-green-500"><i class="fas fa-copy"></i></button>
+                                    <button onclick="deletePlace('${tabKey}', ${place.id})" class="hover:text-red-500"><i class="fas fa-trash-alt"></i></button>
+                                </div>
+                            </div>
+                            
+                            <div class="mt-3 pt-3 border-t border-gray-50 flex justify-between items-center bg-gray-50 -mx-4 -mb-4 p-3 rounded-b-xl">
+                                <select onchange="movePlace('${tabKey}', ${place.id}, this.value)" class="text-xs bg-white border border-gray-200 rounded px-2 py-1 outline-none text-gray-600">
+                                    <option value="">移至...</option>
+                                    ${['unassigned', 'day1', 'day2', 'day3', 'day4', 'day5'].filter(k => k !== tabKey).map(k => `<option value="${k}">${k==='unassigned'?'待安排':k.replace('day','Day ')}</option>`).join('')}
+                                </select>
+                                
+                                ${tabKey !== 'unassigned' ? `
+                                <div class="flex gap-1">
+                                    <button onclick="reorderPlace('${tabKey}', ${index}, -1)" class="bg-white border border-gray-200 text-gray-600 px-2 py-1 rounded text-xs hover:bg-gray-100" ${index===0?'disabled opacity-50':''}><i class="fas fa-arrow-up"></i></button>
+                                    <button onclick="reorderPlace('${tabKey}', ${index}, 1)" class="bg-white border border-gray-200 text-gray-600 px-2 py-1 rounded text-xs hover:bg-gray-100" ${index===places.length-1?'disabled opacity-50':''}><i class="fas fa-arrow-down"></i></button>
+                                </div>
+                                ` : ''}
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                if (tabKey !== 'unassigned' && index < places.length - 1) {
+                    const nextPlace = places[index + 1];
+                    const navUrl = `https://www.google.com/maps/dir/?api=1&origin=${place.lat},${place.lng}&destination=${nextPlace.lat},${nextPlace.lng}`;
+                    html += `
+                        <div class="ml-8 mb-4 -mt-2 flex gap-2">
+                            <a href="${navUrl}&travelmode=driving" target="_blank" class="bg-white border border-gray-200 text-xs text-gray-600 px-3 py-1.5 rounded-full shadow-sm hover:border-blue-400 hover:text-blue-600 transition flex items-center gap-1"><i class="fas fa-car text-blue-500"></i> 開車</a>
+                            <a href="${navUrl}&travelmode=transit" target="_blank" class="bg-white border border-gray-200 text-xs text-gray-600 px-3 py-1.5 rounded-full shadow-sm hover:border-blue-400 hover:text-blue-600 transition flex items-center gap-1"><i class="fas fa-train text-green-500"></i> 大眾運輸</a>
+                            <a href="${navUrl}&travelmode=walking" target="_blank" class="bg-white border border-gray-200 text-xs text-gray-600 px-3 py-1.5 rounded-full shadow-sm hover:border-blue-400 hover:text-blue-600 transition flex items-center gap-1"><i class="fas fa-walking text-orange-500"></i> 步行</a>
+                        </div>
+                    `;
+                }
+            });
+            html += `</div>`;
+            return html;
+        }
+
+        // 搜尋與多選
+        async function searchPlace() {
+            const query = document.getElementById('new-place-input').value;
+            if(!query) return;
+            
+            const btn = event.target;
+            const originalText = btn.innerText;
+            btn.innerText = "搜尋中...";
+            
+            try {
+                const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5`);
+                const data = await response.json();
+                
+                if (data && data.length > 0) {
+                    showSearchResults(data, query);
+                } else {
+                    addCustomPlace(query, "沖縄県那覇市", 26.2123, 127.6792);
+                    showToast("找不到精確座標，已暫存至清單。請使用✏️修改地址");
+                }
+            } catch(e) {
+                addCustomPlace(query, "沖縄県", 26.2123, 127.6792);
+            }
+            
+            document.getElementById('new-place-input').value = '';
+            btn.innerText = originalText;
+        }
+
+        function showSearchResults(results, originalQuery) {
+            const dropdown = document.getElementById('search-results-dropdown');
+            dropdown.innerHTML = '';
+            
+            if(results.length === 1) {
+                selectSearchResult(originalQuery, results[0].display_name, results[0].lat, results[0].lon);
+                return;
+            }
+            
+            let html = '<div class="text-xs text-gray-500 p-2 bg-gray-50 font-bold">請選擇正確的地點：</div>';
+            results.forEach(res => {
+                // 簡化地址顯示
+                const shortAddr = res.display_name.split(',').slice(0, 3).join(', ');
+                html += `
+                    <div class="search-result-item" onclick="selectSearchResult('${originalQuery}', '${res.display_name.replace(/'/g, "\\'")}', ${res.lat}, ${res.lon})">
+                        <div class="font-bold text-sm text-blue-700">${originalQuery}</div>
+                        <div class="text-xs text-gray-500 mt-1">${shortAddr}</div>
+                    </div>
+                `;
+            });
+            html += `<div class="search-result-item text-center text-blue-500 text-xs" onclick="document.getElementById('search-results-dropdown').style.display='none'">取消</div>`;
+            
+            dropdown.innerHTML = html;
+            dropdown.style.display = 'block';
+        }
+
+        function selectSearchResult(name, address, lat, lon) {
+            document.getElementById('search-results-dropdown').style.display = 'none';
+            addCustomPlace(name, address, parseFloat(lat), parseFloat(lon));
+        }
+
+        function addCustomPlace(name, address, lat, lng) {
+            const newPlace = {
+                id: Date.now(),
+                name: name,
+                address: address,
+                lat: lat,
+                lng: lng
+            };
+            tripData[activeTab].push(newPlace);
+            saveData();
             renderTabs();
-            renderItinerary();
-        };
+            renderContent();
+            updateMap();
+            showToast("已新增景點");
+        }
+        
+        function editPlacePrompt(id) {
+            // 尋找景點
+            let targetPlace = null;
+            let targetTab = null;
+            for(let key in tripData) {
+                const found = tripData[key].find(p => p.id === id);
+                if(found) { targetPlace = found; targetTab = key; break; }
+            }
+            if(!targetPlace) return;
+
+            const newName = prompt("請輸入正確的景點名稱 (Google Maps 辨識用):", targetPlace.name);
+            if(newName === null) return; // 取消
+            
+            const newAddr = prompt("請輸入詳細地址 (選填):", targetPlace.address || "");
+            
+            targetPlace.name = newName || targetPlace.name;
+            targetPlace.address = newAddr;
+            
+            saveData();
+            renderContent();
+            showToast("景點已更新");
+        }
+        
+        function copyPlace(id) {
+            let targetPlace = null;
+            for(let key in tripData) {
+                const found = tripData[key].find(p => p.id === id);
+                if(found) { targetPlace = found; break; }
+            }
+            if(targetPlace) {
+                const copy = JSON.parse(JSON.stringify(targetPlace));
+                copy.id = Date.now();
+                copy.name = copy.name + " (複製)";
+                tripData[activeTab].push(copy);
+                saveData();
+                renderTabs();
+                renderContent();
+                updateMap();
+                showToast("景點已複製");
+            }
+        }
+
+        function deletePlace(tabKey, id) {
+            if(confirm('確定要刪除這個景點嗎？')) {
+                tripData[tabKey] = tripData[tabKey].filter(p => p.id !== id);
+                saveData();
+                renderTabs();
+                renderContent();
+                updateMap();
+            }
+        }
+
+        function movePlace(fromTab, id, toTab) {
+            if(!toTab) return;
+            const placeIndex = tripData[fromTab].findIndex(p => p.id === id);
+            if(placeIndex > -1) {
+                const place = tripData[fromTab].splice(placeIndex, 1)[0];
+                tripData[toTab].push(place);
+                saveData();
+                renderTabs();
+                renderContent();
+                updateMap();
+            }
+        }
+
+        function reorderPlace(tabKey, index, direction) {
+            const arr = tripData[tabKey];
+            const newIndex = index + direction;
+            if(newIndex >= 0 && newIndex < arr.length) {
+                const temp = arr[index];
+                arr[index] = arr[newIndex];
+                arr[newIndex] = temp;
+                saveData();
+                renderContent();
+                updateMap();
+            }
+        }
+
+        // --- 備忘錄功能 ---
+        function renderMemos() {
+            let html = `<div class="space-y-6 pb-20">`;
+            for (let category in memos) {
+                const data = memos[category];
+                html += `
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div class="bg-blue-50 px-4 py-3 font-bold text-blue-800 flex justify-between items-center border-b border-blue-100">
+                        <span>${data.title}</span>
+                        <span class="bg-blue-100 text-blue-600 text-xs px-2 py-1 rounded-full">${data.items.filter(i=>i.done).length}/${data.items.length}</span>
+                    </div>
+                    <div class="p-2">
+                        ${data.items.map((item, idx) => `
+                            <div class="flex items-center gap-3 p-2 hover:bg-gray-50 rounded-lg group">
+                                <input type="checkbox" ${item.done ? 'checked' : ''} onchange="toggleMemo('${category}', ${idx})" class="w-5 h-5 text-blue-600 rounded border-gray-300">
+                                <input type="text" value="${item.text}" onchange="updateMemoText('${category}', ${idx}, this.value)" class="flex-1 bg-transparent border-none outline-none ${item.done ? 'line-through text-gray-400' : 'text-gray-700'}">
+                                <button onclick="deleteMemo('${category}', ${idx})" class="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition"><i class="fas fa-times"></i></button>
+                            </div>
+                        `).join('')}
+                        <div class="flex items-center gap-2 p-2 mt-1">
+                            <input type="text" id="new-memo-${category}" placeholder="+ 新增項目..." class="flex-1 bg-gray-50 border border-gray-200 rounded px-3 py-1.5 text-sm outline-none focus:border-blue-400" onkeyup="if(event.key==='Enter') addMemo('${category}')">
+                            <button onclick="addMemo('${category}')" class="bg-blue-100 text-blue-600 px-3 py-1.5 rounded text-sm font-bold hover:bg-blue-200">新增</button>
+                        </div>
+                    </div>
+                </div>`;
+            }
+            html += `</div>`;
+            return html;
+        }
+
+        function toggleMemo(category, idx) {
+            memos[category].items[idx].done = !memos[category].items[idx].done;
+            saveData(); renderContent();
+        }
+        function updateMemoText(category, idx, text) {
+            memos[category].items[idx].text = text;
+            saveData();
+        }
+        function deleteMemo(category, idx) {
+            memos[category].items.splice(idx, 1);
+            saveData(); renderContent();
+        }
+        function addMemo(category) {
+            const input = document.getElementById(`new-memo-${category}`);
+            if(input.value.trim()) {
+                memos[category].items.push({ text: input.value.trim(), done: false });
+                saveData(); renderContent();
+            }
+        }
+
+        // --- 記帳本與 AI 掃描 ---
+        function renderExpenses() {
+            const total = expenses.reduce((sum, exp) => sum + parseFloat(exp.amount || 0), 0);
+            
+            let html = `
+                <div class="bg-gradient-to-r from-emerald-500 to-teal-500 rounded-xl p-5 text-white shadow-md mb-6 relative overflow-hidden">
+                    <div class="relative z-10">
+                        <p class="text-emerald-100 text-sm font-medium mb-1">總花費 (¥)</p>
+                        <h2 class="text-4xl font-bold">¥ ${total.toLocaleString()}</h2>
+                    </div>
+                    <i class="fas fa-coins absolute -bottom-4 -right-2 text-7xl opacity-20 transform -rotate-12"></i>
+                </div>
+                
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 mb-6">
+                    <div class="flex justify-between items-center mb-3">
+                        <h3 class="font-bold text-gray-700">新增花費</h3>
+                        <div class="flex gap-2">
+                            <button onclick="triggerAIScan('camera')" class="bg-purple-100 text-purple-700 px-3 py-1.5 rounded-lg text-sm font-bold hover:bg-purple-200 transition flex items-center gap-1 shadow-sm"><i class="fas fa-camera"></i> 拍照</button>
+                            <button onclick="triggerAIScan('gallery')" class="bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded-lg text-sm font-bold hover:bg-indigo-200 transition flex items-center gap-1 shadow-sm"><i class="fas fa-image"></i> 相簿</button>
+                        </div>
+                    </div>
+                    
+                    <input type="file" id="ai-image-input" accept="image/*" class="hidden" onchange="processAIImage(this)">
+                    <div id="ai-loading" class="hidden text-center py-4 text-purple-600 text-sm font-bold animate-pulse"><i class="fas fa-magic mr-1"></i> AI 辨識中，請稍候...</div>
+                    
+                    <div class="flex gap-2 mb-3">
+                        <select id="exp-category" class="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none">
+                            <option value="🍔 飲食">🍔 飲食</option>
+                            <option value="🚆 交通">🚆 交通</option>
+                            <option value="🛍️ 購物">🛍️ 購物</option>
+                            <option value="🏨 住宿">🏨 住宿</option>
+                            <option value="🎟️ 娛樂">🎟️ 娛樂</option>
+                        </select>
+                        <input type="number" id="exp-amount" placeholder="金額 (¥)" class="w-24 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none">
+                    </div>
+                    <div class="flex gap-2">
+                        <input type="text" id="exp-name" placeholder="消費項目 / 店名" class="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none">
+                        <button onclick="addExpense()" class="bg-emerald-500 text-white px-4 py-2 rounded-lg font-bold shadow-sm hover:bg-emerald-600 transition">記一筆</button>
+                    </div>
+                </div>
+                
+                <div class="space-y-3 pb-20">
+            `;
+            
+            expenses.forEach((exp, idx) => {
+                html += `
+                    <div class="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between group">
+                        <div class="flex items-center gap-3">
+                            <div class="text-2xl">${exp.category.split(' ')[0]}</div>
+                            <div>
+                                <div class="font-bold text-gray-800">${exp.name}</div>
+                                <div class="text-xs text-gray-400">${exp.date || '剛剛'}</div>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <div class="font-bold text-emerald-600">¥ ${parseFloat(exp.amount).toLocaleString()}</div>
+                            <div class="flex gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition">
+                                <button onclick="editExpense(${idx})" class="text-gray-400 hover:text-blue-500 p-1"><i class="fas fa-pencil-alt text-xs"></i></button>
+                                <button onclick="deleteExpense(${idx})" class="text-gray-400 hover:text-red-500 p-1"><i class="fas fa-trash-alt text-xs"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            html += `</div>`;
+            return html;
+        }
+
+        function addExpense() {
+            const cat = document.getElementById('exp-category').value;
+            const amt = document.getElementById('exp-amount').value;
+            const name = document.getElementById('exp-name').value;
+            
+            if(amt && name) {
+                const today = new Date();
+                expenses.unshift({ 
+                    category: cat, 
+                    amount: amt, 
+                    name: name,
+                    date: `${today.getMonth()+1}/${today.getDate()}`
+                });
+                saveData(); renderContent();
+                showToast("記帳成功");
+            }
+        }
+        
+        function deleteExpense(idx) {
+            if(confirm("確定刪除此筆記帳？")) {
+                expenses.splice(idx, 1);
+                saveData(); renderContent();
+            }
+        }
+        
+        function editExpense(idx) {
+            const exp = expenses[idx];
+            const newName = prompt("修改項目名稱:", exp.name);
+            if(newName === null) return;
+            const newAmt = prompt("修改金額:", exp.amount);
+            if(newAmt === null) return;
+            
+            exp.name = newName || exp.name;
+            exp.amount = newAmt || exp.amount;
+            saveData(); renderContent();
+        }
+
+        // --- 金鑰設定面板 ---
+        function setApiKey() {
+            const currentKey = localStorage.getItem('ai_api_key') || "";
+            const newKey = prompt("請貼上您的 Google AI API 金鑰 (AIza...):\n若清空則會停用 AI 功能", currentKey);
+            
+            if (newKey !== null) {
+                localStorage.setItem('ai_api_key', newKey.trim());
+                showToast("金鑰已儲存");
+            }
+        }
+
+        function getApiKey() {
+            return localStorage.getItem('ai_api_key') || defaultApiKey;
+        }
+
+        function triggerAIScan(source) {
+            const key = getApiKey();
+            if(!key) {
+                alert("請先點擊右上角「🔑 金鑰」按鈕設定您的 API Key 才能使用 AI 辨識功能！");
+                return;
+            }
+            
+            const input = document.getElementById('ai-image-input');
+            if(source === 'camera') {
+                input.removeAttribute('capture'); // 先移除以防萬一
+                input.setAttribute('capture', 'environment'); // 強制開啟後鏡頭相機
+            } else {
+                input.removeAttribute('capture'); // 開啟相簿
+            }
+            input.click();
+        }
+
+        async function processAIImage(input) {
+            if(!input.files || input.files.length === 0) return;
+            const file = input.files[0];
+            const apiKey = getApiKey();
+            
+            document.getElementById('ai-loading').classList.remove('hidden');
+            
+            try {
+                // 將圖片轉為 Base64
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = async function () {
+                    const base64Image = reader.result.split(',')[1];
+                    
+                    const requestBody = {
+                        contents: [{
+                            parts: [
+                                { text: "請分析這張收據/發票。請回傳 JSON 格式：{\"store\": \"店名\", \"items\": [\"細項1\", \"細項2\"], \"total\": 數字總金額}。如果是日文收據，請直接抓出含稅總額(合並計算)，店名若無則留空。" },
+                                { inlineData: { mimeType: file.type, data: base64Image } }
+                            ]
+                        }]
+                    };
+
+                    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(requestBody)
+                    });
+                    
+                    const data = await response.json();
+                    if(data.error) throw new Error(data.error.message);
+                    
+                    const textResult = data.candidates[0].content.parts[0].text;
+                    const jsonStr = textResult.replace(/```json\n?/, '').replace(/```\n?/, '');
+                    const result = JSON.parse(jsonStr);
+                    
+                    // 自動合併名稱與細項
+                    let finalName = result.store || "購物/餐飲";
+                    if(result.items && result.items.length > 0) {
+                        finalName += ` (${result.items.join(', ')})`;
+                    }
+                    
+                    document.getElementById('exp-name').value = finalName;
+                    document.getElementById('exp-amount').value = result.total;
+                    
+                    showToast("✨ AI 辨識完成！");
+                };
+            } catch(e) {
+                alert("AI 辨識失敗，請確認圖片清晰或 API Key 是否正確。\n錯誤訊息: " + e.message);
+            } finally {
+                document.getElementById('ai-loading').classList.add('hidden');
+                input.value = ''; 
+            }
+        }
+
+        // --- 啟動 APP ---
+        // 初始檢查是否已登入
+        if (localStorage.getItem('wandermap_auth') === APP_PASSWORD) {
+            initApp();
+        }
     </script>
 </body>
 </html>
