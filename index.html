@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>WanderMap 自由行小幫手</title>
+    <title>WanderMap 自由行小幫手 v8.0</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -29,7 +29,8 @@
             <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4 text-blue-600 text-2xl">
                 <i class="fa-solid fa-lock"></i>
             </div>
-            <h2 class="text-2xl font-bold text-gray-800 mb-2">WanderMap</h2>
+            <h2 class="text-2xl font-bold text-gray-800 mb-1">WanderMap</h2>
+            <div class="text-[11px] font-mono text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full inline-block mb-3">v8.0 穩定版</div>
             <p class="text-sm text-gray-500 mb-6">請輸入密碼以查看私人行程</p>
             <input type="password" id="app-password" class="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-3 text-center text-lg tracking-widest focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all mb-4" placeholder="••••" onkeypress="if(event.key === 'Enter') unlockApp()">
             <button onclick="unlockApp()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition-colors shadow-md">解鎖進入</button>
@@ -38,20 +39,36 @@
 
     <!-- 頂部 Header -->
     <div class="bg-white px-4 py-3 flex justify-between items-center shadow-sm z-20 shrink-0">
-        <h1 class="text-lg font-bold text-gray-800 flex items-center gap-2 cursor-pointer group" onclick="openTripManager()" title="切換行程">
-            WanderMap 
-            <div class="flex items-center gap-1 bg-blue-500 group-hover:bg-blue-600 transition-colors text-white px-2 py-0.5 rounded-full shadow-sm">
-                <span id="header-trip-name" class="text-xs font-normal truncate max-w-[100px]">載入中...</span>
+        <h1 class="text-lg font-bold text-gray-800 flex items-center gap-1.5 cursor-pointer group" onclick="openTripManager()" title="切換行程">
+            <span>WanderMap</span>
+            <span class="text-[10px] font-semibold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">v8.0</span>
+            <div class="flex items-center gap-1 bg-blue-500 group-hover:bg-blue-600 transition-colors text-white px-2 py-0.5 rounded-full shadow-sm ml-1">
+                <span id="header-trip-name" class="text-xs font-normal truncate max-w-[100px]">沖繩五日遊</span>
                 <i class="fa-solid fa-caret-down text-[10px]"></i>
             </div>
         </h1>
         <div class="flex items-center gap-2">
+            <button onclick="exportDataToFile()" class="text-xs bg-emerald-50 text-emerald-700 hover:bg-emerald-100 px-2 py-1.5 rounded-lg font-medium transition-colors border border-emerald-200" title="備份行程檔案">
+                <i class="fa-solid fa-download mr-1"></i>備份
+            </button>
+            <button onclick="importDataFromFile()" class="text-xs bg-sky-50 text-sky-700 hover:bg-sky-100 px-2 py-1.5 rounded-lg font-medium transition-colors border border-sky-200" title="載入備份檔案">
+                <i class="fa-solid fa-upload mr-1"></i>匯入
+            </button>
             <button onclick="showApiKeyPrompt()" class="text-xs bg-amber-50 text-amber-600 hover:bg-amber-100 px-2 py-1.5 rounded-lg font-medium transition-colors border border-amber-200">
                 <i class="fa-solid fa-key mr-1"></i>金鑰
             </button>
             <button onclick="requestResetData()" class="text-xs text-gray-500 hover:text-gray-700 px-2 py-1"><i class="fa-solid fa-rotate-right mr-1"></i>重設</button>
             <button onclick="lockApp()" class="text-xs bg-slate-100 text-slate-600 hover:bg-slate-200 px-2 py-1.5 rounded-lg font-medium transition-colors"><i class="fa-solid fa-lock mr-1"></i>上鎖</button>
         </div>
+    </div>
+
+    <!-- 儲存狀態列 -->
+    <div id="storage-status-banner" class="bg-slate-800 text-white text-[11px] px-3 py-1 flex items-center justify-between z-20 shrink-0">
+        <div class="flex items-center gap-2">
+            <span id="storage-indicator-dot" class="w-2 h-2 rounded-full bg-emerald-400 inline-block animate-pulse"></span>
+            <span id="storage-status-text" class="text-slate-200">正在檢查當地裝置儲存空間...</span>
+        </div>
+        <div id="storage-save-count" class="text-[10px] text-slate-400 font-mono">已就緒</div>
     </div>
 
     <!-- 地圖區域 -->
@@ -100,7 +117,7 @@
         </div>
     </div>
 
-    <!-- 行程管理 Modal (解決 Q1) -->
+    <!-- 行程管理 Modal -->
     <div id="trip-manager-modal" class="fixed inset-0 bg-black/50 z-[80] hidden items-center justify-center backdrop-blur-sm">
         <div class="bg-white w-11/12 max-w-sm rounded-2xl shadow-xl flex flex-col max-h-[80vh]">
             <div class="px-4 py-3 border-b border-gray-100 flex justify-between items-center bg-gray-50 rounded-t-2xl">
@@ -150,8 +167,10 @@
     </div>
 
     <script>
+        const APP_VERSION = "8.0.0";
         const APP_PASSWORD = "1234";
         const DEFAULT_API_KEY = "";
+        let booted = false;
         let map, routeLines = [], markers = [];
         let currentTab = -1; // -3:記帳, -2:備忘錄, -1:待安排, 0~N: Day1~DayN
         let editingPlaceId = null; 
@@ -217,50 +236,334 @@
             };
         };
 
-        // 多行程架構
-        let globalData = { activeTripId: null, trips: [] };
-        let appState = null; 
+        // ==========================================
+        // V8 核心儲存引擎：IndexedDB + localStorage + 時間戳一致性
+        // 原則：先同步寫 localStorage，再排隊寫 IndexedDB；啟動時比較 updatedAt，取最新資料。
+        // ==========================================
+        const DB_NAME = 'WanderMapDB';
+        const DB_VERSION = 3;
+        const STORE_NAME = 'trips_store';
+        const DATA_STORAGE_KEY = 'wanderMapV8_Data';
+        const LEGACY_DATA_KEYS = ['wanderMapV7_Data', 'wanderMapV6_Data'];
 
-        function initData() {
-            // 使用 V7 版本確保這次更新能強制刷新資料
-            const savedData = localStorage.getItem('wanderMapV7_Data');
-            if (savedData) { 
-                try { 
-                    globalData = JSON.parse(savedData); 
-                } catch(e) { console.error("Data parse error", e); } 
+        let dbInstance = null;
+        let globalData = { schemaVersion: 8, activeTripId: null, trips: [], updatedAt: 0 };
+        let appState = null;
+        let isInitialLoadDone = false;
+        let saveCounter = 0;
+        let saveQueue = Promise.resolve();
+
+        function cloneData(value) {
+            return JSON.parse(JSON.stringify(value));
+        }
+
+        function updateStorageStatus(msg, isOk = true) {
+            const statusText = document.getElementById('storage-status-text');
+            const indicator = document.getElementById('storage-indicator-dot');
+            const countText = document.getElementById('storage-save-count');
+            if (statusText) statusText.innerText = msg;
+            if (indicator) {
+                indicator.className = `w-2 h-2 rounded-full inline-block ${isOk ? 'bg-emerald-400' : 'bg-amber-400 animate-ping'}`;
             }
-            
-            if (!globalData || !globalData.trips || globalData.trips.length === 0) {
+            if (countText) countText.innerText = `存檔 #${saveCounter}`;
+        }
+
+        function safeGetItem(key) {
+            try { return window.localStorage.getItem(key); }
+            catch (e) { return null; }
+        }
+
+        function safeSetItem(key, value) {
+            try {
+                window.localStorage.setItem(key, value);
+                return true;
+            } catch (e) {
+                console.warn('localStorage 寫入失敗：', e);
+                return false;
+            }
+        }
+
+        function safeRemoveItem(key) {
+            try { window.localStorage.removeItem(key); }
+            catch (e) {}
+        }
+
+        function normalizeTrip(trip) {
+            if (!trip || typeof trip !== 'object') return generateDefaultTrip();
+            const fallback = generateDefaultTrip(typeof trip.name === 'string' ? trip.name : '我的行程');
+            return {
+                id: trip.id || fallback.id,
+                name: typeof trip.name === 'string' && trip.name.trim() ? trip.name : fallback.name,
+                info: typeof trip.info === 'string' ? trip.info : '',
+                unscheduled: Array.isArray(trip.unscheduled) ? trip.unscheduled : [],
+                days: Array.isArray(trip.days) && trip.days.length > 0 ? trip.days.map(d => Array.isArray(d) ? d : []) : [ [], [], [], [], [] ],
+                memo: {
+                    todo: Array.isArray(trip.memo?.todo) ? trip.memo.todo : [],
+                    docs: Array.isArray(trip.memo?.docs) ? trip.memo.docs : [],
+                    items: Array.isArray(trip.memo?.items) ? trip.memo.items : [],
+                    clothes: Array.isArray(trip.memo?.clothes) ? trip.memo.clothes : []
+                },
+                expenses: Array.isArray(trip.expenses) ? trip.expenses : []
+            };
+        }
+
+        function normalizeGlobalData(data, sourceUpdatedAt = 0) {
+            if (!data || typeof data !== 'object') return null;
+            if (!Array.isArray(data.trips) || data.trips.length === 0) return null;
+            const trips = data.trips.map(normalizeTrip);
+            let activeTripId = data.activeTripId;
+            if (!trips.some(t => t.id === activeTripId)) activeTripId = trips[0].id;
+            const updatedAt = Number(data.updatedAt || sourceUpdatedAt || 0) || 0;
+            return {
+                schemaVersion: Number(data.schemaVersion || 7) || 7,
+                activeTripId,
+                trips,
+                updatedAt
+            };
+        }
+
+        function extractUpdatedAt(obj) {
+            return Number(obj?.updatedAt || obj?.savedAt || 0) || 0;
+        }
+
+        function initIndexedDB() {
+            return new Promise((resolve) => {
+                if (!window.indexedDB) {
+                    console.warn('此瀏覽器不支援 IndexedDB，僅使用 localStorage');
+                    resolve(null);
+                    return;
+                }
+                try {
+                    const request = window.indexedDB.open(DB_NAME, DB_VERSION);
+                    request.onupgradeneeded = (e) => {
+                        const db = e.target.result;
+                        if (!db.objectStoreNames.contains(STORE_NAME)) {
+                            db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+                        }
+                    };
+                    request.onsuccess = (e) => {
+                        dbInstance = e.target.result;
+                        dbInstance.onversionchange = () => dbInstance.close();
+                        resolve(dbInstance);
+                    };
+                    request.onerror = () => resolve(null);
+                } catch (err) {
+                    console.warn('IndexedDB 初始化失敗：', err);
+                    resolve(null);
+                }
+            });
+        }
+
+        function readRecordFromIDB(key) {
+            return new Promise((resolve) => {
+                if (!dbInstance) { resolve(null); return; }
+                try {
+                    const tx = dbInstance.transaction([STORE_NAME], 'readonly');
+                    const store = tx.objectStore(STORE_NAME);
+                    const req = store.get(key);
+                    req.onsuccess = () => resolve(req.result || null);
+                    req.onerror = () => resolve(null);
+                } catch (err) {
+                    resolve(null);
+                }
+            });
+        }
+
+        function writeRecordToIDB(key, payload) {
+            return new Promise((resolve) => {
+                if (!dbInstance) { resolve(false); return; }
+                try {
+                    const tx = dbInstance.transaction([STORE_NAME], 'readwrite');
+                    const store = tx.objectStore(STORE_NAME);
+                    store.put({ id: key, payload: cloneData(payload), updatedAt: Date.now() });
+                    tx.oncomplete = () => resolve(true);
+                    tx.onerror = () => resolve(false);
+                    tx.onabort = () => resolve(false);
+                } catch (err) {
+                    resolve(false);
+                }
+            });
+        }
+
+        async function readBestStoredData() {
+            const candidates = [];
+
+            // IndexedDB
+            const idbRecord = await readRecordFromIDB('current_state');
+            if (idbRecord?.payload) {
+                const normalized = normalizeGlobalData(idbRecord.payload, idbRecord.updatedAt);
+                if (normalized) {
+                    const ts = Math.max(extractUpdatedAt(idbRecord.payload), Number(idbRecord.updatedAt || 0));
+                    candidates.push({ source: 'IndexedDB', data: normalized, updatedAt: ts });
+                }
+            }
+
+            // V8 localStorage
+            const v8Raw = safeGetItem(DATA_STORAGE_KEY);
+            if (v8Raw) {
+                try {
+                    const normalized = normalizeGlobalData(JSON.parse(v8Raw));
+                    if (normalized) candidates.push({ source: 'localStorage V8', data: normalized, updatedAt: extractUpdatedAt(normalized) });
+                } catch (e) {
+                    console.warn('V8 localStorage 資料解析失敗：', e);
+                }
+            }
+
+            // V7/V6 legacy localStorage
+            for (const key of LEGACY_DATA_KEYS) {
+                const raw = safeGetItem(key);
+                if (!raw) continue;
+                try {
+                    const normalized = normalizeGlobalData(JSON.parse(raw));
+                    if (normalized) candidates.push({ source: key, data: normalized, updatedAt: extractUpdatedAt(normalized) });
+                } catch (e) {
+                    console.warn(`${key} 資料解析失敗：`, e);
+                }
+            }
+
+            if (candidates.length === 0) return null;
+            candidates.sort((a, b) => b.updatedAt - a.updatedAt);
+            return candidates[0];
+        }
+
+        async function initData() {
+            await initIndexedDB();
+            const best = await readBestStoredData();
+
+            if (!best) {
                 const initTrip = generateDefaultTrip();
-                globalData = { activeTripId: initTrip.id, trips: [initTrip] };
-            }
-
-            // 設定當前 active state
-            appState = globalData.trips.find(t => t.id === globalData.activeTripId);
-            if (!appState) {
-                appState = globalData.trips[0];
+                globalData = {
+                    schemaVersion: 8,
+                    activeTripId: initTrip.id,
+                    trips: [initTrip],
+                    updatedAt: Date.now()
+                };
+                appState = initTrip;
+                updateStorageStatus('✨ 首次開啟，已建立本機行程');
+                await persistState(true);
+            } else {
+                globalData = best.data;
+                globalData.schemaVersion = 8;
+                appState = globalData.trips.find(t => t.id === globalData.activeTripId) || globalData.trips[0];
                 globalData.activeTripId = appState.id;
+                updateStorageStatus(`🟢 已載入 ${best.source}`);
+                // 若來源是 V6/V7/舊 IDB，立即升級為 V8 格式。
+                if (best.source !== 'IndexedDB' || best.data.schemaVersion !== 8) {
+                    await persistState(true);
+                }
             }
-            
-            document.getElementById('header-trip-name').innerText = appState.name;
+
+            const header = document.getElementById('header-trip-name');
+            if (header && appState) header.innerText = appState.name || '我的行程';
+            isInitialLoadDone = true;
         }
 
-        function saveState() { 
-            localStorage.setItem('wanderMapV7_Data', JSON.stringify(globalData)); 
-            document.getElementById('header-trip-name').innerText = appState.name;
+        async function persistState(isSilent = false) {
+            if (!appState || !globalData) return false;
+
+            const idx = globalData.trips.findIndex(t => t.id === appState.id);
+            const snapshot = cloneData(appState);
+            if (idx !== -1) globalData.trips[idx] = snapshot;
+            else globalData.trips.push(snapshot);
+
+            globalData.activeTripId = appState.id;
+            globalData.schemaVersion = 8;
+            globalData.updatedAt = Date.now();
+            saveCounter++;
+
+            const jsonString = JSON.stringify(globalData);
+            const lsOk = safeSetItem(DATA_STORAGE_KEY, jsonString);
+            // 保留舊 Key 作為跨版本救援資料，但永遠由 V8 作為主版本。
+            safeSetItem('wanderMapV7_Data', jsonString);
+
+            saveQueue = saveQueue.then(async () => {
+                const idbOk = await writeRecordToIDB('current_state', globalData);
+                if (!isSilent) {
+                    if (idbOk) updateStorageStatus(`🟢 已儲存到裝置 (${new Date().toLocaleTimeString()})`);
+                    else if (lsOk) updateStorageStatus(`🟡 已儲存到瀏覽器 (${new Date().toLocaleTimeString()})`);
+                    else updateStorageStatus('🔴 儲存失敗，請立即匯出備份', false);
+                }
+                return idbOk || lsOk;
+            }).catch(err => {
+                console.error('saveQueue error:', err);
+                if (!isSilent) updateStorageStatus('🔴 儲存發生錯誤，請立即匯出備份', false);
+                return lsOk;
+            });
+
+            return saveQueue;
         }
 
-        function saveState() { 
-            localStorage.setItem('wanderMapV6_Data', JSON.stringify(globalData)); 
-            document.getElementById('header-trip-name').innerText = appState.name;
+        // 對外統一只有這一個儲存函式，避免再出現 V6/V7 重複定義 Bug。
+        function saveState(isSilent = false) {
+            return persistState(isSilent);
         }
 
-        function showMessage(msg, isError = false) {
-            const t = document.getElementById('toast');
-            document.getElementById('toast-msg').innerText = msg;
-            t.className = `fixed bottom-10 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full text-sm shadow-lg z-[110] flex items-center gap-2 transition-opacity duration-300 ${isError ? 'bg-red-600 text-white' : 'bg-gray-800 text-white'}`;
-            t.style.opacity = '1'; t.style.pointerEvents = 'auto';
-            setTimeout(() => { t.style.opacity = '0'; t.style.pointerEvents = 'none'; }, 3000);
+        // 關閉 / F5 前：同步再寫一次 localStorage；IndexedDB 不等待，避免 beforeunload 被中斷。
+        window.addEventListener('beforeunload', () => {
+            try {
+                if (appState && globalData) {
+                    const idx = globalData.trips.findIndex(t => t.id === appState.id);
+                    const snapshot = cloneData(appState);
+                    if (idx !== -1) globalData.trips[idx] = snapshot;
+                    else globalData.trips.push(snapshot);
+                    globalData.activeTripId = appState.id;
+                    globalData.schemaVersion = 8;
+                    globalData.updatedAt = Date.now();
+                    const jsonString = JSON.stringify(globalData);
+                    safeSetItem(DATA_STORAGE_KEY, jsonString);
+                    safeSetItem('wanderMapV7_Data', jsonString);
+                }
+            } catch (e) {
+                console.warn('beforeunload 儲存失敗：', e);
+            }
+        });
+
+        // 備份與還原機制
+        async function exportDataToFile() {
+            await saveState(true);
+            const dataStr = 'data:application/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(globalData, null, 2));
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute('href', dataStr);
+            downloadAnchor.setAttribute('download', `WanderMap_Backup_${new Date().toISOString().slice(0,10)}.json`);
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+            showMessage('✅ 已下載 V8 備份檔案！');
+        }
+
+        function importDataFromFile() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json,application/json';
+            input.onchange = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = async (event) => {
+                    try {
+                        const parsed = JSON.parse(event.target.result);
+                        const normalized = normalizeGlobalData(parsed);
+                        if (!normalized) {
+                            showMessage('❌ 備份檔格式不符', true);
+                            return;
+                        }
+                        globalData = normalized;
+                        globalData.schemaVersion = 8;
+                        globalData.updatedAt = Date.now();
+                        appState = globalData.trips.find(t => t.id === globalData.activeTripId) || globalData.trips[0];
+                        await saveState();
+                        currentTab = -1;
+                        renderTabs();
+                        renderItinerary();
+                        showMessage('✅ 成功還原行程資料！');
+                    } catch (err) {
+                        console.error(err);
+                        showMessage('❌ 備份檔讀取失敗', true);
+                    }
+                };
+                reader.readAsText(file);
+            };
+            input.click();
         }
 
         // 自訂 Confirm 視窗 (取代原生 confirm)
@@ -277,38 +580,90 @@
         }
 
         function requestResetData() {
-            showConfirm("確定要重設App嗎？", "這將清空所有的行程與記帳紀錄，回到初始狀態。", () => {
-                localStorage.removeItem('wanderMapV7_Data');
+            showConfirm("確定要重設App嗎？", "這將清空所有的行程與記帳紀錄，回到初始狀態。", async () => {
+                safeRemoveItem(DATA_STORAGE_KEY);
+                LEGACY_DATA_KEYS.forEach(safeRemoveItem);
+                safeRemoveItem('wanderMap_Unlocked');
+                if (dbInstance) {
+                    try {
+                        const tx = dbInstance.transaction([STORE_NAME], 'readwrite');
+                        tx.objectStore(STORE_NAME).clear();
+                    } catch(e) {}
+                }
+                if (dbInstance) { try { await writeRecordToIDB('app_unlocked', false); } catch(e) {} }
                 location.reload();
             });
         }
 
-        function checkLockStatus() {
-            initData(); // 先初始化資料
-            const unlocked = localStorage.getItem('wanderMap_Unlocked');
-            if (unlocked !== 'true') {
-                document.getElementById('lock-screen').style.display = 'flex';
-                setTimeout(() => document.getElementById('lock-screen').style.opacity = '1', 10);
+        function showMessage(msg, isError = false) {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toast-msg');
+            if (!toast || !toastMsg) return;
+            toastMsg.innerText = msg;
+            toast.className = `fixed bottom-10 left-1/2 -translate-x-1/2 text-white px-4 py-2 rounded-full text-sm shadow-lg z-[110] transition-opacity duration-300 flex items-center gap-2 ${isError ? 'bg-red-700' : 'bg-gray-800'}`;
+            toast.style.opacity = '1';
+            toast.style.pointerEvents = 'auto';
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.pointerEvents = 'none';
+            }, 2500);
+        }
+
+        async function checkLockStatus() {
+            // 必須先等待 IndexedDB 與 Storage 完全載入
+            await initData();
+
+            let unlocked = false;
+            try { 
+                unlocked = window.localStorage.getItem('wanderMap_Unlocked') === 'true'; 
+            } catch (e) {}
+
+            // 若 localStorage 被環境清空，向 IndexedDB 複查解鎖標記
+            if (!unlocked) {
+                const idbUnlocked = await readRecordFromIDB('app_unlocked');
+                if (idbUnlocked === true) {
+                    unlocked = true;
+                    safeSetItem('wanderMap_Unlocked', 'true');
+                }
+            }
+
+            const lock = document.getElementById('lock-screen');
+            if (!lock) return;
+
+            if (!unlocked) {
+                lock.style.display = 'flex';
+                lock.style.opacity = '1';
             } else {
-                document.getElementById('lock-screen').style.display = 'none';
-                initMap(); renderTabs(); renderItinerary();
+                lock.style.display = 'none';
+                initMap();
+                renderTabs();
+                renderItinerary();
             }
         }
 
-        function unlockApp() {
+        async function unlockApp() {
             const pwd = document.getElementById('app-password').value;
             if (pwd === APP_PASSWORD) {
-                localStorage.setItem('wanderMap_Unlocked', 'true');
+                safeSetItem('wanderMap_Unlocked', 'true');
+                // 同時存入 IndexedDB，重整(F5)也不會被登出
+                await writeRecordToIDB('app_unlocked', true);
+
                 document.getElementById('lock-screen').style.opacity = '0';
-                setTimeout(() => { document.getElementById('lock-screen').style.display = 'none'; initMap(); renderTabs(); renderItinerary(); }, 300);
+                setTimeout(() => { 
+                    document.getElementById('lock-screen').style.display = 'none'; 
+                    initMap(); 
+                    renderTabs(); 
+                    renderItinerary(); 
+                }, 300);
             } else {
                 showMessage('密碼錯誤！請重新輸入', true);
                 document.getElementById('app-password').value = '';
             }
         }
 
-        function lockApp() {
-            localStorage.removeItem('wanderMap_Unlocked');
+        async function lockApp() {
+            safeRemoveItem('wanderMap_Unlocked');
+            await writeRecordToIDB('app_unlocked', false);
             document.getElementById('lock-screen').style.display = 'flex';
             setTimeout(() => document.getElementById('lock-screen').style.opacity = '1', 10);
             document.getElementById('app-password').value = '';
@@ -339,35 +694,40 @@
 
         function closeTripManager() { document.getElementById('trip-manager-modal').style.display = 'none'; }
 
-        function createNewTrip() {
+        async function createNewTrip() {
             const nameInput = document.getElementById('new-trip-name');
             const name = nameInput.value.trim() || '未命名行程';
             const newTrip = generateDefaultTrip(name);
             globalData.trips.push(newTrip);
             nameInput.value = '';
-            saveState(); openTripManager(); // 刷新列表
+            await saveState(); 
+            openTripManager();
             showMessage("已建立新行程！");
         }
 
-        function switchTrip(id) {
+        async function switchTrip(id) {
             globalData.activeTripId = id;
             appState = globalData.trips.find(t => t.id === id);
-            currentTab = -1; // 預設跳回待安排
-            saveState(); closeTripManager();
-            renderTabs(); renderItinerary();
+            currentTab = -1;
+            await saveState(); 
+            closeTripManager();
+            renderTabs(); 
+            renderItinerary();
             showMessage(`已切換至 ${appState.name}`);
         }
 
         function requestDeleteTrip(id) {
-            showConfirm("刪除行程", "確定要刪除這個行程嗎？", () => {
+            showConfirm("刪除行程", "確定要刪除這個行程嗎？", async () => {
                 globalData.trips = globalData.trips.filter(t => t.id !== id);
                 if (globalData.activeTripId === id) {
                     globalData.activeTripId = globalData.trips[0].id;
                     appState = globalData.trips[0];
                     currentTab = -1;
                 }
-                saveState(); openTripManager();
-                renderTabs(); renderItinerary();
+                await saveState(); 
+                openTripManager();
+                renderTabs(); 
+                renderItinerary();
                 showMessage("已刪除行程");
             });
         }
@@ -430,7 +790,7 @@
                         <i class="fa-solid fa-thumbtack text-xs"></i>待安排 (${unCount})
                      </button>`;
 
-            // 動態 Day 產生 (解決 Q2)
+            // 動態 Day 產生
             appState.days.forEach((day, index) => {
                 const isActive = currentTab === index;
                 html += `<button onclick="switchTab(${index})" class="px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors flex items-center gap-1 shrink-0 ${isActive ? 'bg-blue-600 text-white shadow-sm' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}">
@@ -438,7 +798,7 @@
                          </button>`;
             });
 
-            // 新增天數按鈕 (解決 Q2)
+            // 新增天數按鈕
             html += `<button onclick="addDay()" class="px-3 py-1.5 rounded-full text-sm font-bold text-blue-500 bg-blue-50 border border-dashed border-blue-200 hover:bg-blue-100 transition-colors flex items-center shrink-0" title="增加一天">
                         <i class="fa-solid fa-plus"></i>
                      </button>`;
@@ -456,16 +816,14 @@
             container.innerHTML = html;
         }
 
-        // 動態增加天數功能 (解決 Q2)
+        // 動態增加天數功能
         function addDay() {
             appState.days.push([]);
             saveState();
             renderTabs();
-            // 自動切換到最新的一天
             switchTab(appState.days.length - 1);
             showMessage(`已新增 Day ${appState.days.length}`);
             
-            // 滾動 tab 容器到最右邊
             const tabContainer = document.getElementById('tabs-container');
             setTimeout(() => { tabContainer.scrollLeft = tabContainer.scrollWidth; }, 50);
         }
@@ -560,34 +918,54 @@
         }
 
         function moveToTab(fromTab, index, toTab) {
+            if (fromTab === toTab) return;
             const fromList = fromTab === -1 ? appState.unscheduled : appState.days[fromTab];
             const toList = toTab === -1 ? appState.unscheduled : appState.days[toTab];
-            const item = fromList.splice(index, 1)[0];
+            
+            if (!fromList || !toList || index < 0 || index >= fromList.length) return;
+
+            // 取出景點並推入目標日
+            const [item] = fromList.splice(index, 1);
             toList.push(item);
-            saveState(); renderTabs(); renderItinerary(); showMessage("已移動景點！");
+
+            // 雙重存檔保證
+            saveState(); 
+            renderTabs(); 
+            renderItinerary(); 
+            const targetName = toTab === -1 ? '待安排' : `Day ${toTab + 1}`;
+            showMessage(`已移動至「${targetName}」並已儲存！`);
         }
 
         function reorderItem(tab, index, direction) {
             const list = tab === -1 ? appState.unscheduled : appState.days[tab];
-            if (index + direction < 0 || index + direction >= list.length) return;
+            if (!list || index + direction < 0 || index + direction >= list.length) return;
             const temp = list[index];
             list[index] = list[index + direction];
             list[index + direction] = temp;
-            saveState(); renderItinerary();
+            saveState(); 
+            renderItinerary();
         }
 
         function deleteItem(tab, index) {
             const list = tab === -1 ? appState.unscheduled : appState.days[tab];
+            if (!list || index < 0 || index >= list.length) return;
             list.splice(index, 1);
-            saveState(); renderTabs(); renderItinerary(); showMessage("已刪除景點！");
+            saveState(); 
+            renderTabs(); 
+            renderItinerary(); 
+            showMessage("已刪除景點！");
         }
 
         function cloneItem(tab, index) {
             const list = tab === -1 ? appState.unscheduled : appState.days[tab];
+            if (!list || index < 0 || index >= list.length) return;
             const originalItem = list[index];
-            const clonedItem = { ...originalItem, id: Date.now() }; 
+            const clonedItem = { ...cloneData(originalItem), id: Date.now() }; 
             list.splice(index + 1, 0, clonedItem); 
-            saveState(); renderTabs(); renderItinerary(); showMessage("已複製景點！");
+            saveState(); 
+            renderTabs(); 
+            renderItinerary(); 
+            showMessage("已複製景點！");
         }
 
         function startEditPlace(id) { editingPlaceId = id; renderItinerary(); }
@@ -599,10 +977,14 @@
             if (!newName) { showMessage("景點名稱不能為空！", true); return; }
 
             let list = tab === -1 ? appState.unscheduled : appState.days[tab];
+            if (!list || !list[index]) return;
             list[index].name = newName;
             list[index].address = newAddress;
             list[index].note = newNote;
-            editingPlaceId = null; saveState(); renderItinerary(); showMessage("景點更新成功！");
+            editingPlaceId = null; 
+            saveState(); 
+            renderItinerary(); 
+            showMessage("景點更新成功！");
         }
 
         function getNavUrl(from, to, mode) {
@@ -723,7 +1105,6 @@
         }
 
         function renderMemo() {
-            // 行前與住宿資訊 (解決 Q3)
             let html = `
                 <div class="mb-5 bg-blue-50 p-4 rounded-2xl shadow-sm border border-blue-100">
                     <h3 class="font-bold text-blue-800 flex items-center gap-2 mb-3"><i class="fa-solid fa-hotel text-blue-500"></i>行前資訊與備忘錄</h3>
@@ -732,7 +1113,6 @@
             
             html += `<div class="mb-4 text-[13px] text-gray-500 bg-gray-100/50 p-3 rounded-xl border border-gray-200"><i class="fa-solid fa-lightbulb text-amber-500 mr-2"></i>點擊文字可以修改內容，所有紀錄會自動儲存。</div>`;
             
-            // 待辦清單
             html += `<div class="grid grid-cols-1 md:grid-cols-2 gap-4">`;
             html += renderMemoGroup("旅遊待辦清單", "fa-list-check", "text-blue-500", "todo", appState.memo.todo);
             html += renderMemoGroup("行李檢查表", "fa-suitcase", "text-purple-500", "items", appState.memo.items);
@@ -749,15 +1129,15 @@
             'play': { icon: 'fa-ticket', name: '娛樂', color: 'text-teal-500', bg: 'bg-teal-100' }
         };
 
-        function showApiKeyPrompt() { document.getElementById('api-key-input').value = localStorage.getItem('wanderMap_ApiKey') || ''; document.getElementById('api-key-modal').style.display = 'flex'; }
+        function showApiKeyPrompt() { document.getElementById('api-key-input').value = safeGetItem('wanderMap_ApiKey') || ''; document.getElementById('api-key-modal').style.display = 'flex'; }
         function closeApiKeyPrompt() { document.getElementById('api-key-modal').style.display = 'none'; }
         function saveApiKeyPrompt() {
             const key = document.getElementById('api-key-input').value.trim();
-            if(key) { localStorage.setItem('wanderMap_ApiKey', key); showMessage('金鑰已儲存！'); }
-            else { localStorage.removeItem('wanderMap_ApiKey'); showMessage('金鑰已清除！'); }
+            if(key) { safeSetItem('wanderMap_ApiKey', key); showMessage('金鑰已儲存！'); }
+            else { safeRemoveItem('wanderMap_ApiKey'); showMessage('金鑰已清除！'); }
             closeApiKeyPrompt();
         }
-        function getApiKey() { return localStorage.getItem('wanderMap_ApiKey') || DEFAULT_API_KEY; }
+        function getApiKey() { return safeGetItem('wanderMap_ApiKey') || DEFAULT_API_KEY; }
 
         function triggerCamera() { const input = document.createElement('input'); input.type = 'file'; input.accept = 'image/*'; input.capture = 'environment'; input.onchange = (e) => handleImageUpload(e.target.files[0]); input.click(); }
         function triggerGallery() { const input = document.createElement('input'); input.type = 'file'; input.accept = 'image/*'; input.onchange = (e) => handleImageUpload(e.target.files[0]); input.click(); }
@@ -885,7 +1265,39 @@
             document.getElementById('itinerary-list').innerHTML = html;
         }
 
-        window.onload = checkLockStatus;
+        async function bootApp() {
+            if (booted) return;
+            booted = true;
+            try {
+                await checkLockStatus();
+            } catch (e) {
+                console.error('WanderMap 啟動失敗：', e);
+                // 最後保底：即使儲存引擎失敗，也讓使用者能看到程式，而不是永遠卡在「載入中」。
+                try {
+                    if (!appState) {
+                        const initTrip = generateDefaultTrip();
+                        globalData = { schemaVersion: 8, activeTripId: initTrip.id, trips: [initTrip], updatedAt: Date.now() };
+                        appState = initTrip;
+                    }
+                    const lock = document.getElementById('lock-screen');
+                    if (lock) lock.style.display = 'none';
+                    const header = document.getElementById('header-trip-name');
+                    if (header) header.innerText = appState.name;
+                    initMap();
+                    renderTabs();
+                    renderItinerary();
+                    updateStorageStatus('🟡 儲存系統暫時受限，請先匯出備份', false);
+                } catch (fatal) {
+                    console.error('WanderMap 備援啟動仍失敗：', fatal);
+                }
+            }
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => { bootApp(); }, { once: true });
+        } else {
+            bootApp();
+        }
     </script>
 </body>
 </html>
