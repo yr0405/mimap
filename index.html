@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>WanderMap 自由行小幫手 v8.2</title>
+    <title>WanderMap 自由行小幫手 v8.3</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -30,7 +30,7 @@
                 <i class="fa-solid fa-lock"></i>
             </div>
             <h2 class="text-2xl font-bold text-gray-800 mb-1">WanderMap</h2>
-            <div class="text-[11px] font-mono text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full inline-block mb-3">v8.2 輕量版</div>
+            <div class="text-[11px] font-mono text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full inline-block mb-3">v8.3 智慧版</div>
             <p class="text-sm text-gray-500 mb-6">請輸入密碼以查看私人行程</p>
             <input type="password" id="app-password" class="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-3 text-center text-lg tracking-widest focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all mb-4" placeholder="••••" onkeypress="if(event.key === 'Enter') unlockApp()">
             <button onclick="unlockApp()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition-colors shadow-md">解鎖進入</button>
@@ -42,7 +42,7 @@
         <div class="flex items-center gap-1.5 min-w-0">
             <h1 class="text-base sm:text-lg font-bold text-gray-800 flex items-center gap-1 shrink-0">
                 <span>WanderMap</span>
-                <span class="text-[10px] font-semibold text-slate-500 bg-slate-100 px-1 py-0.5 rounded border border-slate-200">v8.2</span>
+                <span class="text-[10px] font-semibold text-slate-500 bg-slate-100 px-1 py-0.5 rounded border border-slate-200">v8.3</span>
             </h1>
             <button onclick="openTripManager()" class="flex items-center gap-1 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 px-2 py-1 rounded-full text-xs font-medium transition-colors max-w-[130px] sm:max-w-[200px]" title="切換行程">
                 <i class="fa-solid fa-plane-departure text-[10px] text-blue-500"></i>
@@ -194,7 +194,7 @@
     <input type="file" id="invoice-gallery-input" accept="image/*" class="hidden" onchange="onInvoiceFileSelected(this)">
 
     <script>
-        const APP_VERSION = "8.2.0";
+        const APP_VERSION = "8.3.0";
         const APP_PASSWORD = "1234";
         const DEFAULT_API_KEY = "";
         let booted = false;
@@ -1233,7 +1233,7 @@
                 // 使用支援圖像理解與結構化輸出的 gemini-3-flash-preview
                 const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
                 
-                const prompt = "請仔細辨識這張收據/發票的內容，提取出消費明細名稱、最終含稅總金額（純整數數字，若日圓含小數請四捨五入），以及最適合的分類（可選：food, transport, shopping, stay, play）。店名與品項可組合成單一字串，例如：'Lawson (飯糰, 綠茶)'。";
+                const prompt = "請仔細辨識這張收據/發票的內容，提取出：\n1. 消費明細/店名（例如：'Lawson (飯糰, 綠茶)'）\n2. 最終含稅總金額（純整數數字，若日圓含小數請四捨五入）\n3. 最適合的分類（可選：food, transport, shopping, stay, play）\n4. 發票/收據上的實際購買日期（格式請轉換為 YYYY/MM/DD，若有日本和曆如令和R6/R7請換算為西元西元年份；若收據上完全找不到日期則回傳空字串）。";
 
                 const payload = {
                     contents: [{
@@ -1255,7 +1255,8 @@
                             properties: {
                                 "name": { "type": "STRING", "description": "店名或品項名稱" },
                                 "amount": { "type": "INTEGER", "description": "含稅總金額純數字" },
-                                "category": { "type": "STRING", "description": "food, transport, shopping, stay, play 之一" }
+                                "category": { "type": "STRING", "description": "food, transport, shopping, stay, play 之一" },
+                                "date": { "type": "STRING", "description": "發票上的實際購買日期，格式為 YYYY/MM/DD 或 YYYY-MM-DD" }
                             },
                             required: ["name", "amount"]
                         }
@@ -1308,7 +1309,13 @@
                     if (result.category && expenseCategories[result.category]) {
                         document.getElementById('exp-cat').value = result.category;
                     }
-                    showMessage('✅ 發票辨識成功，已自動帶入！');
+                    if (result.date && result.date.trim()) {
+                        // 統一格式為 YYYY/MM/DD
+                        const formattedDate = result.date.replace(/-/g, '/').trim();
+                        const dateInput = document.getElementById('exp-date');
+                        if (dateInput) dateInput.value = formattedDate;
+                    }
+                    showMessage('✅ 發票辨識成功，已自動帶入發票日期！');
                 } catch (parseErr) {
                     console.error('JSON Parse Error:', parseErr);
                     showMessage('❌ 辨識結果解析異常，請手動確認輸入', true);
@@ -1317,12 +1324,22 @@
             reader.readAsDataURL(file);
         }
 
+        function getTodayString() {
+            const now = new Date();
+            const y = now.getFullYear();
+            const m = String(now.getMonth() + 1).padStart(2, '0');
+            const d = String(now.getDate()).padStart(2, '0');
+            return `${y}/${m}/${d}`;
+        }
+
         function addExpense() {
             const name = document.getElementById('exp-name').value.trim();
             const amount = parseInt(document.getElementById('exp-amount').value);
             const cat = document.getElementById('exp-cat').value;
+            const dateInput = document.getElementById('exp-date');
+            const date = (dateInput && dateInput.value.trim()) ? dateInput.value.trim() : getTodayString();
             if (!name || isNaN(amount)) { showMessage('請輸入正確的名稱與金額', true); return; }
-            appState.expenses.unshift({ id: Date.now(), name, amount, cat, date: new Date().toLocaleDateString() });
+            appState.expenses.unshift({ id: Date.now(), name, amount, cat, date });
             saveState(); renderExpenses(); showMessage('已記一筆！');
         }
 
@@ -1333,13 +1350,17 @@
         function saveEditExpense(index) {
             const name = document.getElementById(`edit-exp-name-${index}`).value.trim();
             const amount = parseInt(document.getElementById(`edit-exp-amount-${index}`).value);
+            const dateVal = document.getElementById(`edit-exp-date-${index}`)?.value.trim();
             if (!name || isNaN(amount)) { showMessage('格式錯誤', true); return; }
-            appState.expenses[index].name = name; appState.expenses[index].amount = amount;
+            appState.expenses[index].name = name; 
+            appState.expenses[index].amount = amount;
+            if (dateVal) appState.expenses[index].date = dateVal;
             editingExpenseIndex = -1; saveState(); renderExpenses(); showMessage('更新成功');
         }
 
         function renderExpenses() {
             const total = appState.expenses.reduce((sum, exp) => sum + exp.amount, 0);
+            const todayStr = getTodayString();
             let html = `
                 <div class="bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl p-5 text-white shadow-md mb-4 relative overflow-hidden">
                     <i class="fa-solid fa-coins absolute -right-4 -bottom-4 text-7xl text-white opacity-20"></i>
@@ -1365,9 +1386,12 @@
                         <div class="flex gap-2">
                             <div class="relative flex-1">
                                 <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-mono">¥</span>
-                                <input type="number" id="exp-amount" placeholder="0" class="w-full bg-gray-50 border border-gray-200 rounded-lg pl-8 pr-3 py-2 text-sm outline-none focus:border-green-500 font-mono" onkeypress="if(event.key === 'Enter') addExpense()">
+                                <input type="number" id="exp-amount" placeholder="0" class="w-full bg-gray-50 border border-gray-200 rounded-lg pl-8 pr-3 py-2 text-sm outline-none focus:border-green-500 font-mono">
                             </div>
-                            <button onclick="addExpense()" class="bg-green-600 hover:bg-green-700 text-white rounded-lg px-4 font-bold whitespace-nowrap shadow-sm">記一筆</button>
+                            <div class="relative w-[130px] shrink-0">
+                                <input type="text" id="exp-date" value="${todayStr}" placeholder="YYYY/MM/DD" title="發票或消費日期" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-2 text-xs font-mono text-gray-700 outline-none focus:border-green-500" onkeypress="if(event.key === 'Enter') addExpense()">
+                            </div>
+                            <button onclick="addExpense()" class="bg-green-600 hover:bg-green-700 text-white rounded-lg px-4 font-bold whitespace-nowrap shadow-sm text-sm">記一筆</button>
                         </div>
                     </div>
                 </div>
@@ -1385,10 +1409,13 @@
                         <div class="flex-1 min-w-0">
                             ${editingExpenseIndex === index ? `
                                 <input type="text" id="edit-exp-name-${index}" value="${exp.name}" class="w-full text-sm font-bold border-b border-gray-300 outline-none mb-1">
-                                <input type="number" id="edit-exp-amount-${index}" value="${exp.amount}" class="w-20 text-xs border-b border-gray-300 outline-none text-red-500 font-mono">
+                                <div class="flex items-center gap-2 mt-1">
+                                    <input type="number" id="edit-exp-amount-${index}" value="${exp.amount}" class="w-20 text-xs border-b border-gray-300 outline-none text-red-500 font-mono">
+                                    <input type="text" id="edit-exp-date-${index}" value="${exp.date}" class="w-24 text-[11px] border-b border-gray-300 outline-none text-gray-500 font-mono">
+                                </div>
                             ` : `
                                 <div class="font-bold text-gray-800 text-sm truncate">${exp.name}</div>
-                                <div class="text-[11px] text-gray-400">${exp.date}</div>
+                                <div class="text-[11px] text-gray-400 flex items-center gap-1"><i class="fa-regular fa-calendar text-[10px]"></i>${exp.date}</div>
                             `}
                         </div>
                         ${editingExpenseIndex === index ? `
