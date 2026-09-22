@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>WanderMap 自由行小幫手 v8.1</title>
+    <title>WanderMap 自由行小幫手 v8.2</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -30,7 +30,7 @@
                 <i class="fa-solid fa-lock"></i>
             </div>
             <h2 class="text-2xl font-bold text-gray-800 mb-1">WanderMap</h2>
-            <div class="text-[11px] font-mono text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full inline-block mb-3">v8.1 輕量版</div>
+            <div class="text-[11px] font-mono text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full inline-block mb-3">v8.2 輕量版</div>
             <p class="text-sm text-gray-500 mb-6">請輸入密碼以查看私人行程</p>
             <input type="password" id="app-password" class="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-3 text-center text-lg tracking-widest focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all mb-4" placeholder="••••" onkeypress="if(event.key === 'Enter') unlockApp()">
             <button onclick="unlockApp()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition-colors shadow-md">解鎖進入</button>
@@ -42,7 +42,7 @@
         <div class="flex items-center gap-1.5 min-w-0">
             <h1 class="text-base sm:text-lg font-bold text-gray-800 flex items-center gap-1 shrink-0">
                 <span>WanderMap</span>
-                <span class="text-[10px] font-semibold text-slate-500 bg-slate-100 px-1 py-0.5 rounded border border-slate-200">v8.1</span>
+                <span class="text-[10px] font-semibold text-slate-500 bg-slate-100 px-1 py-0.5 rounded border border-slate-200">v8.2</span>
             </h1>
             <button onclick="openTripManager()" class="flex items-center gap-1 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 px-2 py-1 rounded-full text-xs font-medium transition-colors max-w-[130px] sm:max-w-[200px]" title="切換行程">
                 <i class="fa-solid fa-plane-departure text-[10px] text-blue-500"></i>
@@ -189,8 +189,12 @@
         </div>
     </div>
 
+    <!-- 隱藏專用上傳 Input (相機與相簿獨立，避免重複觸發失效) -->
+    <input type="file" id="invoice-camera-input" accept="image/*" capture="environment" class="hidden" onchange="onInvoiceFileSelected(this)">
+    <input type="file" id="invoice-gallery-input" accept="image/*" class="hidden" onchange="onInvoiceFileSelected(this)">
+
     <script>
-        const APP_VERSION = "8.1.0";
+        const APP_VERSION = "8.2.0";
         const APP_PASSWORD = "1234";
         const DEFAULT_API_KEY = "";
         let booted = false;
@@ -1198,8 +1202,23 @@
         }
         function getApiKey() { return safeGetItem('wanderMap_ApiKey') || DEFAULT_API_KEY; }
 
-        function triggerCamera() { const input = document.createElement('input'); input.type = 'file'; input.accept = 'image/*'; input.capture = 'environment'; input.onchange = (e) => handleImageUpload(e.target.files[0]); input.click(); }
-        function triggerGallery() { const input = document.createElement('input'); input.type = 'file'; input.accept = 'image/*'; input.onchange = (e) => handleImageUpload(e.target.files[0]); input.click(); }
+        function triggerCamera() {
+            const el = document.getElementById('invoice-camera-input');
+            if (el) { el.value = ''; el.click(); }
+        }
+
+        function triggerGallery() {
+            const el = document.getElementById('invoice-gallery-input');
+            if (el) { el.value = ''; el.click(); }
+        }
+
+        function onInvoiceFileSelected(inputElement) {
+            if (inputElement.files && inputElement.files[0]) {
+                const file = inputElement.files[0];
+                inputElement.value = ''; // 立即重置，確保下一次拍照/選圖必定觸發 onchange
+                handleImageUpload(file);
+            }
+        }
 
         async function handleImageUpload(file) {
             if (!file) return;
